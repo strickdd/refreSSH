@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "refreSSH",
+  "project_id": "2633b9bb-67e5-4d51-a660-074356d1fb82"
+}
