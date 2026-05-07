@@ -1,0 +1,25 @@
+{
+	"name": "refreSSH Go Dev",
+	"build": {
+		"dockerfile": "Dockerfile"
+	},
+	"features": {
+		"ghcr.io/devcontainers/features/go:1": {
+			"version": "1.26.2"
+		}
+	},
+	"customizations": {
+		"vscode": {
+			"settings": {
+				"go.toolsManagement.checkForUpdates": "local",
+				"go.useLanguageServer": true,
+				"go.gopath": "/go"
+			},
+			"extensions": [
+				"golang.Go",
+				"ms-vscode.go"
+			]
+		}
+	},
+	"remoteUser": "vscode"
+}
