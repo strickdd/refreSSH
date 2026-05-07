@@ -16,10 +16,10 @@ const (
 )
 
 type model struct {
-	tabs         []string
+	tabs           []string
 	activeTabIndex int
-	curMode      mode
-	terminal     string
+	curMode        mode
+	terminal       string
 }
 
 func InitialModel() model {
@@ -102,7 +102,7 @@ func (m model) View() string {
 		modeStr = " COMMAND "
 		style = commandModeStyle
 	}
-	
+
 	doc.WriteString(style.Render(modeStr))
 	if m.curMode == modeCommand {
 		doc.WriteString(" :_")
