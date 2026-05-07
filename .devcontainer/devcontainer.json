@@ -16,7 +16,6 @@
 				"go.gopath": "/go"
 			},
 			"extensions": [
-				"golang.Go",
 				"ms-vscode.go"
 			]
 		}
