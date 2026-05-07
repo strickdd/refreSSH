@@ -124,7 +124,7 @@ func TestBroadcaster(t *testing.T) {
 
 func TestBroadcaster_SlowClient(t *testing.T) {
 	b := NewBroadcaster()
-	
+
 	// c1 is slow and blocks
 	c1 := newMockClient("slow")
 	blocked := make(chan struct{})
@@ -132,18 +132,18 @@ func TestBroadcaster_SlowClient(t *testing.T) {
 		<-blocked
 		return len(p), nil
 	}
-	
+
 	// c2 is fast
 	c2 := newMockClient("fast")
-	
+
 	b.AddClient(c1)
 	b.AddClient(c2)
-	
+
 	// Broadcast multiple messages
 	for i := 0; i < 10; i++ {
 		b.Broadcast([]byte("data"))
 	}
-	
+
 	// c2 should receive all of them immediately despite c1 being blocked
 	for i := 0; i < 10; i++ {
 		select {
@@ -152,14 +152,14 @@ func TestBroadcaster_SlowClient(t *testing.T) {
 			t.Fatalf("Fast client c2 was blocked at message %d", i)
 		}
 	}
-	
+
 	// Unblock c1
 	close(blocked)
 }
 
 func TestBroadcaster_DropData(t *testing.T) {
 	b := NewBroadcaster()
-	
+
 	// Client with a blocking write
 	c := newMockClient("slow")
 	writeCalled := make(chan struct{})
@@ -168,24 +168,24 @@ func TestBroadcaster_DropData(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 		return len(p), nil
 	}
-	
+
 	b.AddClient(c)
-	
+
 	// Fill the buffer + 2 (one in flight, one in buffer, one to trigger drop)
-	// Actually clientBufferSize is 256. 
+	// Actually clientBufferSize is 256.
 	// Let's just broadcast many messages.
-	
+
 	for i := 0; i < clientBufferSize+10; i++ {
 		b.Broadcast([]byte("data"))
 	}
-	
+
 	// Broadcast should not block
 	done := make(chan struct{})
 	go func() {
 		b.Broadcast([]byte("last"))
 		close(done)
 	}()
-	
+
 	select {
 	case <-done:
 		// Success: Broadcast didn't block
@@ -198,14 +198,14 @@ func TestBroadcaster_Close(t *testing.T) {
 	b := NewBroadcaster()
 	c := newMockClient("c")
 	b.AddClient(c)
-	
+
 	b.Close()
-	
+
 	// Wait a bit for the goroutine to exit
 	time.Sleep(10 * time.Millisecond)
-	
+
 	b.Broadcast([]byte("test"))
-	
+
 	// c should not receive anything because its loop is closed
 	select {
 	case <-c.written:

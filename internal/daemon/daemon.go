@@ -2,8 +2,8 @@ package daemon
 
 import (
 	"fmt"
-	"sync"
 	"github.com/strickdd/refressh/internal/api"
+	"sync"
 )
 
 type Daemon struct {
@@ -21,7 +21,7 @@ func New() *Daemon {
 
 func (d *Daemon) Start() error {
 	fmt.Println("Daemon starting...")
-	
+
 	// Create a default session for now
 	s := NewSession("default", "bash")
 	if err := s.Start(); err != nil {
@@ -34,7 +34,7 @@ func (d *Daemon) Start() error {
 			}
 		}
 	}
-	
+
 	d.mu.Lock()
 	d.sessions[s.id] = s
 	d.mu.Unlock()
