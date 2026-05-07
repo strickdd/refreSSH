@@ -1,6 +1,6 @@
 module github.com/strickdd/refressh
 
-go 1.26.2
+go 1.23
 
 require (
 	github.com/creack/pty v1.1.24
