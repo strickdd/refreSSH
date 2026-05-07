@@ -39,6 +39,9 @@ func (d *Daemon) Start() error {
 	d.sessions[s.id] = s
 	d.mu.Unlock()
 
+	// Set the input writer so Broadcaster can forward input to the PTY
+	d.broadcaster.SetInputWriter(s.pty)
+
 	// Start broadcasting loop
 	go d.broadcastLoop(s)
 
@@ -46,6 +49,18 @@ func (d *Daemon) Start() error {
 }
 
 func (d *Daemon) broadcastLoop(s *Session) {
+	defer func() {
+		s.mu.Lock()
+		s.running = false
+		if s.pty != nil {
+			_ = s.pty.Close()
+		}
+		if s.cmd != nil && s.cmd.Process != nil {
+			_ = s.cmd.Wait()
+		}
+		s.mu.Unlock()
+	}()
+
 	buf := make([]byte, 1024)
 	for {
 		n, err := s.pty.Read(buf)

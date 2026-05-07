@@ -8,18 +8,20 @@ import (
 )
 
 type mockClient struct {
-	id        string
-	mu        sync.Mutex
-	buf       bytes.Buffer
-	status    Status
-	written   chan struct{}
-	WriteFunc func(p []byte) (int, error)
+	id            string
+	mu            sync.Mutex
+	buf           bytes.Buffer
+	status        Status
+	written       chan struct{}
+	statusChanged chan struct{}
+	WriteFunc     func(p []byte) (int, error)
 }
 
 func newMockClient(id string) *mockClient {
 	return &mockClient{
-		id:      id,
-		written: make(chan struct{}, 1000),
+		id:            id,
+		written:       make(chan struct{}, 1000),
+		statusChanged: make(chan struct{}, 1000),
 	}
 }
 
@@ -38,6 +40,7 @@ func (m *mockClient) SendStatus(status Status) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.status = status
+	m.statusChanged <- struct{}{}
 	return nil
 }
 
@@ -58,15 +61,28 @@ func TestBroadcaster(t *testing.T) {
 	c1 := newMockClient("client1")
 	c2 := newMockClient("client2")
 
+	inputBuf := &bytes.Buffer{}
+	b.SetInputWriter(inputBuf)
+
+	// Wait for status change
+	waitStatus := func(c *mockClient) {
+		select {
+		case <-c.statusChanged:
+		case <-time.After(100 * time.Millisecond):
+			t.Fatalf("Timeout waiting for %s status change", c.id)
+		}
+	}
+
 	// Test AddClient
 	b.AddClient(c1)
-	time.Sleep(10 * time.Millisecond)
+	waitStatus(c1)
 	if !c1.getStatus().IsPrimary {
 		t.Error("First client should be primary")
 	}
 
 	b.AddClient(c2)
-	time.Sleep(10 * time.Millisecond)
+	waitStatus(c1) // c1 should get a status update (even if it doesn't change)
+	waitStatus(c2)
 	if c2.getStatus().IsPrimary {
 		t.Error("Second client should not be primary")
 	}
@@ -95,7 +111,8 @@ func TestBroadcaster(t *testing.T) {
 
 	// Test Primary Handoff
 	b.SetPrimary("client2")
-	time.Sleep(10 * time.Millisecond)
+	waitStatus(c1)
+	waitStatus(c2)
 	if c1.getStatus().IsPrimary {
 		t.Error("client1 should no longer be primary")
 	}
@@ -113,10 +130,13 @@ func TestBroadcaster(t *testing.T) {
 	if n != 4 {
 		t.Error("Primary client should be able to send input")
 	}
+	if inputBuf.String() != "good" {
+		t.Errorf("Expected 'good' in input buffer, got '%s'", inputBuf.String())
+	}
 
 	// Test RemoveClient (Handoff)
 	b.RemoveClient("client2")
-	time.Sleep(10 * time.Millisecond)
+	waitStatus(c1)
 	if !c1.getStatus().IsPrimary {
 		t.Error("client1 should be promoted back to primary")
 	}

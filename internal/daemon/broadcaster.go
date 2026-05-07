@@ -32,6 +32,7 @@ type clientState struct {
 type Broadcaster struct {
 	clients         map[string]*clientState
 	primaryClientID string
+	inputWriter     io.Writer
 	mu              sync.RWMutex
 }
 
@@ -41,9 +42,19 @@ func NewBroadcaster() *Broadcaster {
 	}
 }
 
-func (b *Broadcaster) AddClient(c Client) {
+func (b *Broadcaster) SetInputWriter(w io.Writer) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	b.inputWriter = w
+}
+
+func (b *Broadcaster) AddClient(c Client) {
+	b.mu.Lock()
+
+	// If client already exists, close the old one to avoid goroutine leaks
+	if oldState, ok := b.clients[c.ID()]; ok {
+		close(oldState.quit)
+	}
 
 	state := &clientState{
 		client: c,
@@ -58,14 +69,13 @@ func (b *Broadcaster) AddClient(c Client) {
 	if b.primaryClientID == "" {
 		b.primaryClientID = c.ID()
 	}
+	b.mu.Unlock()
 
 	b.updateClientStatuses()
 }
 
 func (b *Broadcaster) RemoveClient(id string) {
 	b.mu.Lock()
-	defer b.mu.Unlock()
-
 	if state, ok := b.clients[id]; ok {
 		close(state.quit)
 		delete(b.clients, id)
@@ -79,17 +89,18 @@ func (b *Broadcaster) RemoveClient(id string) {
 			break
 		}
 	}
+	b.mu.Unlock()
 
 	b.updateClientStatuses()
 }
 
 func (b *Broadcaster) SetPrimary(id string) {
 	b.mu.Lock()
-	defer b.mu.Unlock()
 	if _, ok := b.clients[id]; ok {
 		b.primaryClientID = id
-		b.updateClientStatuses()
 	}
+	b.mu.Unlock()
+	b.updateClientStatuses()
 }
 
 func (b *Broadcaster) Close() {
@@ -102,9 +113,23 @@ func (b *Broadcaster) Close() {
 }
 
 func (b *Broadcaster) updateClientStatuses() {
+	b.mu.RLock()
+	type target struct {
+		c         Client
+		isPrimary bool
+	}
+	var targets []target
 	for id, state := range b.clients {
-		_ = state.client.SendStatus(Status{
-			IsPrimary: id == b.primaryClientID,
+		targets = append(targets, target{
+			c:         state.client,
+			isPrimary: id == b.primaryClientID,
+		})
+	}
+	b.mu.RUnlock()
+
+	for _, t := range targets {
+		_ = t.c.SendStatus(Status{
+			IsPrimary: t.isPrimary,
 		})
 	}
 }
@@ -130,15 +155,17 @@ func (b *Broadcaster) Broadcast(data []byte) {
 	copy(dataCopy, data)
 
 	b.mu.RLock()
-	defer b.mu.RUnlock()
-
+	var states []*clientState
 	for _, state := range b.clients {
+		states = append(states, state)
+	}
+	b.mu.RUnlock()
+
+	for _, state := range states {
 		select {
 		case state.send <- dataCopy:
 		default:
 			// Slow client: drop the oldest message and try again to keep current data.
-			// This ensures the client eventually catches up with the latest state
-			// even if they miss some intermediate output.
 			select {
 			case <-state.send:
 			default:
@@ -155,13 +182,13 @@ func (b *Broadcaster) Broadcast(data []byte) {
 func (b *Broadcaster) HandleInput(clientID string, data []byte) (int, error) {
 	b.mu.RLock()
 	isPrimary := clientID == b.primaryClientID
+	writer := b.inputWriter
 	b.mu.RUnlock()
 
-	if !isPrimary {
-		// Ignore input from non-primary clients
+	if !isPrimary || writer == nil {
+		// Ignore input from non-primary clients or if no writer is set
 		return 0, nil
 	}
 
-	// This would write to the PTY
-	return len(data), nil
+	return writer.Write(data)
 }
