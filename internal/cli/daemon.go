@@ -2,8 +2,8 @@ package cli
 
 import (
 	"fmt"
-	"github.com/strickdd/refressh/internal/daemon"
 	"github.com/spf13/cobra"
+	"github.com/strickdd/refressh/internal/daemon"
 )
 
 var daemonCmd = &cobra.Command{
