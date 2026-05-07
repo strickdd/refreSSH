@@ -12,6 +12,14 @@ bd close <id>         # Complete work
 bd dolt push          # Push beads data to remote
 ```
 
+## Cross-Platform Shell Commands
+
+Always determine the current OS before executing chained commands.
+
+- **PowerShell (Windows):** Use `;` instead of `&&` for chaining commands (e.g., `cmd1; cmd2`).
+- **Unix (Linux/macOS):** Use `&&` for conditional chaining.
+- **Best Practice:** Prefer single commands or multiple tool calls when possible to avoid shell-specific syntax issues.
+
 ## Non-Interactive Shell Commands
 
 **ALWAYS use non-interactive flags** with file operations to avoid hanging on confirmation prompts.

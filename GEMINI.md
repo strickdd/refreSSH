@@ -86,4 +86,8 @@ The daemon starts on-demand when the user runs the first `refressh` command. It 
 - **Formatting:** Standard `gofmt` / `goimports`.
 - **Security:** The Web UI must enforce strict local-only binding (`127.0.0.1`) to prevent external access.
 - **State Management:** Robust handling of PTY state, especially when clients abruptly disconnect.
+- **Shell Commands:** 
+  - **PowerShell (Windows):** Use `;` instead of `&&` for chaining commands (e.g., `cmd1; cmd2`).
+  - **Unix (Linux/macOS):** Use `&&` for conditional chaining.
+  - **Guidance:** Always determine the current OS before executing chained commands. Prefer single commands or multiple tool calls when possible to avoid shell-specific syntax issues.
 

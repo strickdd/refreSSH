@@ -66,4 +66,8 @@ _Add a brief overview of your project architecture_
 
 ## Conventions & Patterns
 
-_Add your project-specific conventions here_
+- **Shell Commands:** 
+  - **PowerShell (Windows):** Use `;` instead of `&&` for chaining commands (e.g., `cmd1; cmd2`).
+  - **Unix (Linux/macOS):** Use `&&` for conditional chaining.
+  - **Guidance:** Always determine the current OS before executing chained commands. Prefer single commands or multiple tool calls when possible to avoid shell-specific syntax issues.
+- **Go Patterns:** Use standard `gofmt` and idiomatic Go practices.
