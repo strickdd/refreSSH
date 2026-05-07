@@ -2,8 +2,9 @@ package daemon
 
 import (
 	"fmt"
-	"github.com/strickdd/refressh/internal/api"
 	"sync"
+
+	"github.com/strickdd/refressh/internal/api"
 )
 
 type Daemon struct {

@@ -4,8 +4,10 @@
 package daemon
 
 import (
-	"github.com/creack/pty"
+	"errors"
 	"os"
+
+	"github.com/creack/pty"
 )
 
 type unixPTY struct {
@@ -43,6 +45,10 @@ func (p *unixPTY) Wait() error {
 func (s *Session) Start() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if s.running {
+		return errors.New("session already running")
+	}
 
 	f, err := pty.Start(s.cmd)
 	if err != nil {

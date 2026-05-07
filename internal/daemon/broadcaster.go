@@ -3,6 +3,7 @@ package daemon
 import (
 	"io"
 	"sync"
+	"time"
 )
 
 // Client represents a connected user/interface
@@ -54,6 +55,7 @@ func (b *Broadcaster) AddClient(c Client) {
 	// If client already exists, close the old one to avoid goroutine leaks
 	if oldState, ok := b.clients[c.ID()]; ok {
 		close(oldState.quit)
+		delete(b.clients, c.ID())
 	}
 
 	state := &clientState{
@@ -138,7 +140,21 @@ func (b *Broadcaster) clientWriteLoop(state *clientState) {
 	for {
 		select {
 		case data := <-state.send:
-			_, _ = state.client.Write(data)
+			// Ensure write doesn't block indefinitely
+			done := make(chan struct{})
+			go func() {
+				_, _ = state.client.Write(data)
+				close(done)
+			}()
+
+			select {
+			case <-done:
+				// Write completed
+			case <-time.After(5 * time.Second):
+				// Write timed out
+			case <-state.quit:
+				return
+			}
 		case <-state.quit:
 			return
 		}

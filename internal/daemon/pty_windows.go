@@ -4,6 +4,7 @@
 package daemon
 
 import (
+	"errors"
 	"fmt"
 	"io"
 )
@@ -19,12 +20,18 @@ func (p *pipePTY) Close() error {
 	_ = p.in.Close()
 	return p.out.Close()
 }
-func (p *pipePTY) Resize(rows, cols uint16) error { return nil }
-func (p *pipePTY) Wait() error                    { return nil }
+func (p *pipePTY) Resize(rows, cols uint16) error {
+	return fmt.Errorf("not supported on Windows")
+}
+func (p *pipePTY) Wait() error { return nil }
 
 func (s *Session) Start() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if s.running {
+		return errors.New("session already running")
+	}
 
 	// On Windows, if we don't have a real PTY implementation yet,
 	// we fall back to using pipes. This allows basic interaction.
