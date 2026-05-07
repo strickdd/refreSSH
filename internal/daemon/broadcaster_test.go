@@ -2,37 +2,72 @@ package daemon
 
 import (
 	"bytes"
+	"sync"
 	"testing"
+	"time"
 )
 
 type mockClient struct {
-	id     string
-	buf    bytes.Buffer
-	status Status
+	id        string
+	mu        sync.Mutex
+	buf       bytes.Buffer
+	status    Status
+	written   chan struct{}
+	WriteFunc func(p []byte) (int, error)
+}
+
+func newMockClient(id string) *mockClient {
+	return &mockClient{
+		id:      id,
+		written: make(chan struct{}, 1000),
+	}
 }
 
 func (m *mockClient) ID() string { return m.id }
 func (m *mockClient) Write(p []byte) (n int, err error) {
-	return m.buf.Write(p)
+	if m.WriteFunc != nil {
+		return m.WriteFunc(p)
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	n, err = m.buf.Write(p)
+	m.written <- struct{}{}
+	return n, err
 }
 func (m *mockClient) SendStatus(status Status) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.status = status
 	return nil
 }
 
+func (m *mockClient) getStatus() Status {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.status
+}
+
+func (m *mockClient) getBuffer() []byte {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.buf.Bytes()
+}
+
 func TestBroadcaster(t *testing.T) {
 	b := NewBroadcaster()
-	c1 := &mockClient{id: "client1"}
-	c2 := &mockClient{id: "client2"}
+	c1 := newMockClient("client1")
+	c2 := newMockClient("client2")
 
 	// Test AddClient
 	b.AddClient(c1)
-	if !c1.status.IsPrimary {
+	time.Sleep(10 * time.Millisecond)
+	if !c1.getStatus().IsPrimary {
 		t.Error("First client should be primary")
 	}
 
 	b.AddClient(c2)
-	if c2.status.IsPrimary {
+	time.Sleep(10 * time.Millisecond)
+	if c2.getStatus().IsPrimary {
 		t.Error("Second client should not be primary")
 	}
 
@@ -40,19 +75,31 @@ func TestBroadcaster(t *testing.T) {
 	msg := []byte("hello")
 	b.Broadcast(msg)
 
-	if !bytes.Equal(c1.buf.Bytes(), msg) {
-		t.Errorf("Expected %s, got %s", msg, c1.buf.String())
+	// Wait for delivery
+	waitChan := func(c *mockClient) {
+		select {
+		case <-c.written:
+		case <-time.After(100 * time.Millisecond):
+			t.Fatalf("Timeout waiting for %s broadcast", c.id)
+		}
 	}
-	if !bytes.Equal(c2.buf.Bytes(), msg) {
-		t.Errorf("Expected %s, got %s", msg, c2.buf.String())
+	waitChan(c1)
+	waitChan(c2)
+
+	if !bytes.Equal(c1.getBuffer(), msg) {
+		t.Errorf("Expected %s, got %s", msg, string(c1.getBuffer()))
+	}
+	if !bytes.Equal(c2.getBuffer(), msg) {
+		t.Errorf("Expected %s, got %s", msg, string(c2.getBuffer()))
 	}
 
 	// Test Primary Handoff
 	b.SetPrimary("client2")
-	if c1.status.IsPrimary {
+	time.Sleep(10 * time.Millisecond)
+	if c1.getStatus().IsPrimary {
 		t.Error("client1 should no longer be primary")
 	}
-	if !c2.status.IsPrimary {
+	if !c2.getStatus().IsPrimary {
 		t.Error("client2 should now be primary")
 	}
 
@@ -69,7 +116,101 @@ func TestBroadcaster(t *testing.T) {
 
 	// Test RemoveClient (Handoff)
 	b.RemoveClient("client2")
-	if !c1.status.IsPrimary {
+	time.Sleep(10 * time.Millisecond)
+	if !c1.getStatus().IsPrimary {
 		t.Error("client1 should be promoted back to primary")
+	}
+}
+
+func TestBroadcaster_SlowClient(t *testing.T) {
+	b := NewBroadcaster()
+	
+	// c1 is slow and blocks
+	c1 := newMockClient("slow")
+	blocked := make(chan struct{})
+	c1.WriteFunc = func(p []byte) (int, error) {
+		<-blocked
+		return len(p), nil
+	}
+	
+	// c2 is fast
+	c2 := newMockClient("fast")
+	
+	b.AddClient(c1)
+	b.AddClient(c2)
+	
+	// Broadcast multiple messages
+	for i := 0; i < 10; i++ {
+		b.Broadcast([]byte("data"))
+	}
+	
+	// c2 should receive all of them immediately despite c1 being blocked
+	for i := 0; i < 10; i++ {
+		select {
+		case <-c2.written:
+		case <-time.After(100 * time.Millisecond):
+			t.Fatalf("Fast client c2 was blocked at message %d", i)
+		}
+	}
+	
+	// Unblock c1
+	close(blocked)
+}
+
+func TestBroadcaster_DropData(t *testing.T) {
+	b := NewBroadcaster()
+	
+	// Client with a blocking write
+	c := newMockClient("slow")
+	writeCalled := make(chan struct{})
+	c.WriteFunc = func(p []byte) (int, error) {
+		writeCalled <- struct{}{}
+		time.Sleep(100 * time.Millisecond)
+		return len(p), nil
+	}
+	
+	b.AddClient(c)
+	
+	// Fill the buffer + 2 (one in flight, one in buffer, one to trigger drop)
+	// Actually clientBufferSize is 256. 
+	// Let's just broadcast many messages.
+	
+	for i := 0; i < clientBufferSize+10; i++ {
+		b.Broadcast([]byte("data"))
+	}
+	
+	// Broadcast should not block
+	done := make(chan struct{})
+	go func() {
+		b.Broadcast([]byte("last"))
+		close(done)
+	}()
+	
+	select {
+	case <-done:
+		// Success: Broadcast didn't block
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("Broadcast blocked on slow client")
+	}
+}
+
+func TestBroadcaster_Close(t *testing.T) {
+	b := NewBroadcaster()
+	c := newMockClient("c")
+	b.AddClient(c)
+	
+	b.Close()
+	
+	// Wait a bit for the goroutine to exit
+	time.Sleep(10 * time.Millisecond)
+	
+	b.Broadcast([]byte("test"))
+	
+	// c should not receive anything because its loop is closed
+	select {
+	case <-c.written:
+		t.Error("Client received message after broadcaster was closed")
+	case <-time.After(50 * time.Millisecond):
+		// Success
 	}
 }
