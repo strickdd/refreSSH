@@ -19,6 +19,11 @@ type Client interface {
 	SendStatus(Status) error
 }
 
+const (
+	// clientBufferSize is the number of messages a client channel can hold before dropping data.
+	clientBufferSize = 100
+)
+
 type clientState struct {
 	client Client
 	send   chan []byte
@@ -60,7 +65,7 @@ func (b *Broadcaster) AddClient(c Client) {
 
 	state := &clientState{
 		client: c,
-		send:   make(chan []byte, 100), // Buffer to prevent slow clients from blocking
+		send:   make(chan []byte, clientBufferSize),
 		quit:   make(chan struct{}),
 	}
 	b.clients[c.ID()] = state

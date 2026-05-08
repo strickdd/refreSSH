@@ -2,7 +2,6 @@ package daemon
 
 import (
 	"io"
-	"os"
 	"os/exec"
 	"sync"
 )

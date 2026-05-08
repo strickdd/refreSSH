@@ -40,7 +40,7 @@ func TestGetConfigDir(t *testing.T) {
 		t.Errorf("expected absolute path, got %s", dir)
 	}
 
-	expectedBase := "refreSSH"
+	expectedBase := ".refreSSH"
 	if filepath.Base(dir) != expectedBase {
 		t.Errorf("expected base name %s, got %s", expectedBase, filepath.Base(dir))
 	}
@@ -85,19 +85,11 @@ func TestSaveAndLoad(t *testing.T) {
 		}
 	}()
 
-	// Mock GetConfigDir by overriding it or using a version that takes a base path.
-	// For simplicity in this test, we'll just test the Save/Load logic with a custom path if we can.
-	// Since Load/Save currently use GetConfigDir internally, we might want to refactor them
-	// to allow passing a path for better testability, but for now let's just test that they work.
-
 	cfg := NewDefaultConfig()
 	cfg.Port = 9999
 	cfg.DefaultTerminal = "test-terminal"
 
-	// We'll manually test the marshalling/unmarshalling logic here since we can't easily
-	// override GetConfigDir without changing the API or using a global variable.
-
-	configPath := filepath.Join(tmpDir, ConfigFileName)
+	configPath := filepath.Join(tmpDir, "config.json")
 
 	// Test saving to custom path
 	data, err := json.MarshalIndent(cfg, "", "  ")
