@@ -1,0 +1,26 @@
+services:
+  sandbox:
+    build:
+      context: ../../
+      dockerfile: deploy/sandbox/Dockerfile
+    container_name: refressh-sandbox
+    environment:
+      - REFRESSH_API_LISTEN=0.0.0.0:9000
+    ports:
+      # Map to 127.0.0.1 on the host for security.
+      # This ensures the API is only accessible from the host itself.
+      - "127.0.0.1:9000:9000"
+    restart: unless-stopped
+    volumes:
+      - refressh-data:/home/refressh/.refreSSH
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+
+volumes:
+  refressh-data:
