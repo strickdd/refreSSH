@@ -26,7 +26,7 @@ func (p *unixPTY) Resize(rows, cols uint16) error {
 	})
 }
 
-// Start launches the terminal process and attaches it to a PTY on Unix systems.
+// Start launches the terminal process and attaches it to a PTY on Unix-like systems.
 func (s *Session) Start() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

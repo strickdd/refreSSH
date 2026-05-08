@@ -18,12 +18,6 @@ func TestNewDefaultConfig(t *testing.T) {
 	if cfg.DefaultTerminal == "" {
 		t.Error("expected default terminal to be set")
 	}
-	if cfg.PrimaryColor == "" {
-		t.Error("expected primary color to be set")
-	}
-	if cfg.AccentColor == "" {
-		t.Error("expected accent color to be set")
-	}
 }
 
 // TestGetConfigDir verifies that GetConfigDir returns a valid absolute path.

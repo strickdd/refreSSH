@@ -6,13 +6,15 @@ import (
 	"sync"
 )
 
-// PTY defines the interface for a Pseudo-Terminal or its fallback.
+// PTY defines the abstract interface for terminal emulation.
+// It allows refreSSH to support both real pseudo-terminals and fallback mechanisms.
 type PTY interface {
 	io.ReadWriteCloser
+	// Resize updates the terminal dimensions.
 	Resize(rows, cols uint16) error
 }
 
-// Session represents a single terminal session managed by the daemon.
+// Session represents a single persistent terminal instance.
 type Session struct {
 	id      string
 	command string
@@ -23,7 +25,7 @@ type Session struct {
 	mu      sync.Mutex
 }
 
-// NewSession creates a new terminal session with the given ID and command.
+// NewSession creates and initializes a new terminal Session with the specified parameters.
 func NewSession(id string, command string, args ...string) *Session {
 	return &Session{
 		id:      id,

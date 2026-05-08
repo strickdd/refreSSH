@@ -14,9 +14,9 @@ func Start(port int) error {
 	fmt.Printf("API Server starting on %s...\n", addr)
 
 	// Basic health check endpoint
-	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		if _, err := fmt.Fprintf(w, "OK"); err != nil {
-			// In a real app, we might log this, but for now we just suppress it to satisfy errcheck
+			// Suppress error to satisfy errcheck
 			_ = err
 		}
 	})

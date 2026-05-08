@@ -8,8 +8,8 @@ import (
 	"github.com/strickdd/refressh/internal/config"
 )
 
-// Daemon represents the core background process of refreSSH.
-// It manages terminal sessions and distributes their output to connected clients.
+// Daemon represents the central orchestrator of refreSSH.
+// It manages the lifecycle of terminal sessions and coordinates communication with clients.
 type Daemon struct {
 	config      *config.Config
 	sessions    map[string]*Session
@@ -17,8 +17,8 @@ type Daemon struct {
 	mu          sync.RWMutex
 }
 
-// New creates a new Daemon instance with the provided configuration.
-// If cfg is nil, a default configuration is used.
+// New creates and returns a new Daemon instance with the specified configuration.
+// If cfg is nil, the default application configuration will be used.
 func New(cfg *config.Config) *Daemon {
 	if cfg == nil {
 		cfg = config.NewDefaultConfig()
@@ -30,7 +30,7 @@ func New(cfg *config.Config) *Daemon {
 	}
 }
 
-// Start launches the daemon, initializes the default terminal session, and starts the API server.
+// Start begins the daemon's operations, starting the initial terminal session and the local API server.
 func (d *Daemon) Start() error {
 	fmt.Println("Daemon starting...")
 
@@ -51,7 +51,7 @@ func (d *Daemon) Start() error {
 	d.sessions[s.id] = s
 	d.mu.Unlock()
 
-	// Connect broadcaster to PTY input
+	// Set the input writer so Broadcaster can forward input to the PTY
 	d.broadcaster.SetInputWriter(s.pty)
 
 	// Start broadcasting loop
@@ -63,10 +63,11 @@ func (d *Daemon) Start() error {
 func (d *Daemon) broadcastLoop(s *Session) {
 	defer func() {
 		s.mu.Lock()
+		s.running = false
 		if s.pty != nil {
 			_ = s.pty.Close()
 		}
-		if s.cmd != nil {
+		if s.cmd != nil && s.cmd.Process != nil {
 			_ = s.cmd.Wait()
 		}
 		s.mu.Unlock()

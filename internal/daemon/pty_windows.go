@@ -21,7 +21,7 @@ func (p *pipePTY) Close() error {
 	return p.stdout.Close()
 }
 
-func (p *pipePTY) Resize(rows, cols uint16) error {
+func (p *pipePTY) Resize(_rows, _cols uint16) error {
 	return fmt.Errorf("resize not supported on windows pipes")
 }
 
