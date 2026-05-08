@@ -4,52 +4,55 @@
 package daemon
 
 import (
-	"errors"
 	"fmt"
 	"io"
+	"os/exec"
 )
 
 type pipePTY struct {
-	in  io.WriteCloser
-	out io.ReadCloser
+	stdin  io.WriteCloser
+	stdout io.ReadCloser
 }
 
-func (p *pipePTY) Read(b []byte) (int, error)  { return p.out.Read(b) }
-func (p *pipePTY) Write(b []byte) (int, error) { return p.in.Write(b) }
+func (p *pipePTY) Read(b []byte) (int, error)  { return p.stdout.Read(b) }
+func (p *pipePTY) Write(b []byte) (int, error) { return p.stdin.Write(b) }
 func (p *pipePTY) Close() error {
-	_ = p.in.Close()
-	return p.out.Close()
+	p.stdin.Close()
+	return p.stdout.Close()
 }
-func (p *pipePTY) Resize(rows, cols uint16) error {
-	return fmt.Errorf("not supported on Windows")
-}
-func (p *pipePTY) Wait() error { return nil }
 
+func (p *pipePTY) Resize(_rows, _cols uint16) error {
+	return fmt.Errorf("resize not supported on windows pipes")
+}
+
+// Start launches the terminal process and uses standard pipes as a PTY fallback on Windows.
 func (s *Session) Start() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if s.running {
-		return errors.New("session already running")
+		return fmt.Errorf("session already running")
 	}
 
-	// On Windows, if we don't have a real PTY implementation yet,
-	// we fall back to using pipes. This allows basic interaction.
-	inPipe, err := s.cmd.StdinPipe()
+	c := exec.Command(s.command, s.args...)
+
+	stdin, err := c.StdinPipe()
 	if err != nil {
-		return fmt.Errorf("failed to create stdin pipe: %v", err)
+		return fmt.Errorf("failed to create stdin pipe: %w", err)
 	}
-	outPipe, err := s.cmd.StdoutPipe()
+
+	stdout, err := c.StdoutPipe()
 	if err != nil {
-		return fmt.Errorf("failed to create stdout pipe: %v", err)
-	}
-	s.cmd.Stderr = s.cmd.Stdout
-
-	if err := s.cmd.Start(); err != nil {
-		return fmt.Errorf("failed to start command: %v", err)
+		return fmt.Errorf("failed to create stdout pipe: %w", err)
 	}
 
-	s.pty = &pipePTY{in: inPipe, out: outPipe}
+	if err := c.Start(); err != nil {
+		return fmt.Errorf("failed to start process: %w", err)
+	}
+
+	s.cmd = c
+	s.pty = &pipePTY{stdin: stdin, stdout: stdout}
 	s.running = true
+
 	return nil
 }

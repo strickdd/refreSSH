@@ -8,6 +8,8 @@ import (
 	"github.com/strickdd/refressh/internal/config"
 )
 
+// Daemon represents the central orchestrator of refreSSH.
+// It manages the lifecycle of terminal sessions and coordinates communication with clients.
 type Daemon struct {
 	config      *config.Config
 	sessions    map[string]*Session
@@ -15,6 +17,8 @@ type Daemon struct {
 	mu          sync.RWMutex
 }
 
+// New creates and returns a new Daemon instance with the specified configuration.
+// If cfg is nil, the default application configuration will be used.
 func New(cfg *config.Config) *Daemon {
 	if cfg == nil {
 		cfg = config.NewDefaultConfig()
@@ -26,6 +30,7 @@ func New(cfg *config.Config) *Daemon {
 	}
 }
 
+// Start begins the daemon's operations, starting the initial terminal session and the local API server.
 func (d *Daemon) Start() error {
 	fmt.Println("Daemon starting...")
 
@@ -37,7 +42,7 @@ func (d *Daemon) Start() error {
 		if err := s.Start(); err != nil {
 			s = NewSession("default", "cmd.exe")
 			if err := s.Start(); err != nil {
-				return fmt.Errorf("failed to start any shell: %v", err)
+				return fmt.Errorf("failed to start any shell: %w", err)
 			}
 		}
 	}
