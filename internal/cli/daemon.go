@@ -2,7 +2,9 @@ package cli
 
 import (
 	"fmt"
+
 	"github.com/spf13/cobra"
+	"github.com/strickdd/refressh/internal/config"
 	"github.com/strickdd/refressh/internal/daemon"
 )
 
@@ -15,7 +17,13 @@ var startCmd = &cobra.Command{
 	Use:   "start",
 	Short: "Start the refreSSH daemon",
 	Run: func(cmd *cobra.Command, args []string) {
-		d := daemon.New()
+		cfg, err := config.Load()
+		if err != nil {
+			fmt.Printf("Error loading config: %v\n", err)
+			return
+		}
+
+		d := daemon.New(cfg)
 		if err := d.Start(); err != nil {
 			fmt.Printf("Error starting daemon: %v\n", err)
 		}
