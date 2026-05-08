@@ -43,8 +43,6 @@ linters-settings:
     rules:
       - name: exported
         severity: warning
-      - name: package-comments
-        severity: warning
       - name: dot-imports
         severity: error
       - name: blank-imports
