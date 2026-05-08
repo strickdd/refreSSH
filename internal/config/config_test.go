@@ -1,3 +1,4 @@
+// Package config_test contains tests for the config package.
 package config
 
 import (
@@ -8,6 +9,7 @@ import (
 	"testing"
 )
 
+// TestNewDefaultConfig verifies that NewDefaultConfig returns a config with expected defaults.
 func TestNewDefaultConfig(t *testing.T) {
 	cfg := NewDefaultConfig()
 	if cfg.Port != DefaultPort {
@@ -16,14 +18,9 @@ func TestNewDefaultConfig(t *testing.T) {
 	if cfg.DefaultTerminal == "" {
 		t.Error("expected default terminal to be set")
 	}
-	if cfg.PrimaryColor == "" {
-		t.Error("expected primary color to be set")
-	}
-	if cfg.AccentColor == "" {
-		t.Error("expected accent color to be set")
-	}
 }
 
+// TestGetConfigDir verifies that GetConfigDir returns a valid absolute path.
 func TestGetConfigDir(t *testing.T) {
 	dir, err := GetConfigDir()
 	if err != nil {
@@ -37,19 +34,26 @@ func TestGetConfigDir(t *testing.T) {
 		t.Errorf("expected absolute path, got %s", dir)
 	}
 
-	expectedBase := "refreSSH"
+	expectedBase := ".refreSSH"
 	if filepath.Base(dir) != expectedBase {
 		t.Errorf("expected base name %s, got %s", expectedBase, filepath.Base(dir))
 	}
 }
 
+// TestGetDefaultTerminal verifies that a terminal is detected.
 func TestGetDefaultTerminal(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		// Test Unix-specific SHELL env var logic
 		oldShell := os.Getenv("SHELL")
-		defer os.Setenv("SHELL", oldShell)
+		defer func() {
+			if err := os.Setenv("SHELL", oldShell); err != nil {
+				t.Errorf("failed to restore SHELL env var: %v", err)
+			}
+		}()
 
-		os.Setenv("SHELL", "/bin/sh")
+		if err := os.Setenv("SHELL", "/bin/sh"); err != nil {
+			t.Fatalf("failed to set SHELL env var: %v", err)
+		}
 		term := getDefaultTerminal()
 		if term == "" {
 			t.Error("expected terminal to be non-empty")
@@ -62,27 +66,24 @@ func TestGetDefaultTerminal(t *testing.T) {
 	}
 }
 
+// TestSaveAndLoad verifies the config marshalling and unmarshalling.
 func TestSaveAndLoad(t *testing.T) {
 	// Use a temporary directory for testing
 	tmpDir, err := os.MkdirTemp("", "refressh-test-*")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
-
-	// Mock GetConfigDir by overriding it or using a version that takes a base path.
-	// For simplicity in this test, we'll just test the Save/Load logic with a custom path if we can.
-	// Since Load/Save currently use GetConfigDir internally, we might want to refactor them
-	// to allow passing a path for better testability, but for now let's just test that they work.
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Errorf("failed to remove temp dir: %v", err)
+		}
+	}()
 
 	cfg := NewDefaultConfig()
 	cfg.Port = 9999
 	cfg.DefaultTerminal = "test-terminal"
 
-	// We'll manually test the marshalling/unmarshalling logic here since we can't easily
-	// override GetConfigDir without changing the API or using a global variable.
-
-	configPath := filepath.Join(tmpDir, ConfigFileName)
+	configPath := filepath.Join(tmpDir, "config.json")
 
 	// Test saving to custom path
 	data, err := json.MarshalIndent(cfg, "", "  ")

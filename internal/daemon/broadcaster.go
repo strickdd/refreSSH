@@ -6,20 +6,20 @@ import (
 	"time"
 )
 
-// Client represents a connected user/interface
+// Client represents a connected user or automated interface.
 type Client interface {
 	io.Writer
 	ID() string
 	SendStatus(status Status) error
 }
 
-// Status represents the state of a client (Primary or View-only)
+// Status represents the operational state of a client (e.g., whether it is the primary controller).
 type Status struct {
 	IsPrimary bool `json:"is_primary"`
 }
 
 const (
-	// clientBufferSize is the number of messages to buffer per client
+	// clientBufferSize is the number of messages to buffer per client before dropping data.
 	clientBufferSize = 256
 )
 
@@ -29,7 +29,7 @@ type clientState struct {
 	quit   chan struct{}
 }
 
-// Broadcaster manages multiple clients and broadcasts data to them
+// Broadcaster manages a set of connected clients and handles asynchronous PTY output distribution.
 type Broadcaster struct {
 	clients         map[string]*clientState
 	primaryClientID string
@@ -37,18 +37,21 @@ type Broadcaster struct {
 	mu              sync.RWMutex
 }
 
+// NewBroadcaster creates and initializes a new Broadcaster instance.
 func NewBroadcaster() *Broadcaster {
 	return &Broadcaster{
 		clients: make(map[string]*clientState),
 	}
 }
 
+// SetInputWriter specifies the writer (usually a PTY) where primary client input should be directed.
 func (b *Broadcaster) SetInputWriter(w io.Writer) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.inputWriter = w
 }
 
+// AddClient registers a new client with the broadcaster and starts its individual write loop.
 func (b *Broadcaster) AddClient(c Client) {
 	b.mu.Lock()
 
@@ -76,6 +79,7 @@ func (b *Broadcaster) AddClient(c Client) {
 	b.updateClientStatuses()
 }
 
+// RemoveClient unregisters a client by its unique identifier and cleans up its resources.
 func (b *Broadcaster) RemoveClient(id string) {
 	b.mu.Lock()
 	if state, ok := b.clients[id]; ok {
@@ -96,6 +100,7 @@ func (b *Broadcaster) RemoveClient(id string) {
 	b.updateClientStatuses()
 }
 
+// SetPrimary designates a specific connected client as the primary controller.
 func (b *Broadcaster) SetPrimary(id string) {
 	b.mu.Lock()
 	if _, ok := b.clients[id]; ok {
@@ -105,6 +110,7 @@ func (b *Broadcaster) SetPrimary(id string) {
 	b.updateClientStatuses()
 }
 
+// Close terminates all client write loops and clears the client registry.
 func (b *Broadcaster) Close() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -161,6 +167,7 @@ func (b *Broadcaster) clientWriteLoop(state *clientState) {
 	}
 }
 
+// Broadcast distributes a copy of the data slice to all currently registered clients.
 func (b *Broadcaster) Broadcast(data []byte) {
 	if len(data) == 0 {
 		return
@@ -195,6 +202,7 @@ func (b *Broadcaster) Broadcast(data []byte) {
 	}
 }
 
+// HandleInput forwards input from a specific client to the registered input writer if the client is the primary.
 func (b *Broadcaster) HandleInput(clientID string, data []byte) (int, error) {
 	b.mu.RLock()
 	isPrimary := clientID == b.primaryClientID
