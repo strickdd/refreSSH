@@ -5,16 +5,22 @@ import (
 	"sync"
 
 	"github.com/strickdd/refressh/internal/api"
+	"github.com/strickdd/refressh/internal/config"
 )
 
 type Daemon struct {
+	config      *config.Config
 	sessions    map[string]*Session
 	broadcaster *Broadcaster
 	mu          sync.RWMutex
 }
 
-func New() *Daemon {
+func New(cfg *config.Config) *Daemon {
+	if cfg == nil {
+		cfg = config.NewDefaultConfig()
+	}
 	return &Daemon{
+		config:      cfg,
 		sessions:    make(map[string]*Session),
 		broadcaster: NewBroadcaster(),
 	}
@@ -23,10 +29,10 @@ func New() *Daemon {
 func (d *Daemon) Start() error {
 	fmt.Println("Daemon starting...")
 
-	// Create a default session for now
-	s := NewSession("default", "bash")
+	// Create a default session using configured terminal
+	s := NewSession("default", d.config.DefaultTerminal)
 	if err := s.Start(); err != nil {
-		// Fallback to sh or cmd.exe
+		// Fallback to sh or cmd.exe if the configured one fails
 		s = NewSession("default", "sh")
 		if err := s.Start(); err != nil {
 			s = NewSession("default", "cmd.exe")
@@ -46,7 +52,7 @@ func (d *Daemon) Start() error {
 	// Start broadcasting loop
 	go d.broadcastLoop(s)
 
-	return api.Start()
+	return api.Start(d.config.Port)
 }
 
 func (d *Daemon) broadcastLoop(s *Session) {
