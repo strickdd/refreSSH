@@ -9,6 +9,22 @@ linters:
     - staticcheck
     - unused
     - ineffassign
+    - revive
+    - gocritic
+    - gosec
+    - misspell
+    - gocyclo
+    - whitespace
+
+linters-settings:
+  govet:
+    enable-all: true
+    disable:
+      - fieldalignment
+  gocyclo:
+    min-complexity: 15
+  misspell:
+    locale: US
 
 issues:
   exclude-use-default: false
