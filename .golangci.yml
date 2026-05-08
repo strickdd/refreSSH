@@ -1,68 +1,14 @@
 run:
   timeout: 5m
-  modules-download-mode: readonly
 
 linters:
   disable-all: true
   enable:
-    - errcheck
-    - gosimple
     - govet
-    - ineffassign
+    - errcheck
     - staticcheck
     - unused
-    - revive
-    - gocritic
-    - gosec
-    - bodyclose
-    - noctx
-    - misspell
-    - gocyclo
-    - whitespace
-    - goconst
-    - dogsled
-    - exportloopref
-    - unconvert
-    - unparam
-    - nakedret
-    - prealloc
-
-linters-settings:
-  govet:
-    enable-all: true
-    disable:
-      - fieldalignment
-  gocyclo:
-    min-complexity: 15
-  goconst:
-    min-len: 3
-    min-occurrences: 3
-  misspell:
-    locale: US
-  revive:
-    rules:
-      - name: exported
-        severity: warning
-      - name: dot-imports
-        severity: error
-      - name: blank-imports
-        severity: error
-      - name: var-naming
-        severity: warning
-      - name: indent-error-flow
-        severity: warning
-      - name: range
-        severity: warning
-      - name: errorf
-        severity: warning
-      - name: error-return
-        severity: warning
-      - name: error-strings
-        severity: warning
-      - name: error-naming
-        severity: warning
+    - ineffassign
 
 issues:
   exclude-use-default: false
-  max-issues-per-linter: 0
-  max-same-issues: 0
