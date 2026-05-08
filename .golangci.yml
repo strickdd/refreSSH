@@ -16,15 +16,5 @@ linters:
     - gocyclo
     - whitespace
 
-linters-settings:
-  govet:
-    enable-all: true
-    disable:
-      - fieldalignment
-  gocyclo:
-    min-complexity: 15
-  misspell:
-    locale: US
-
 issues:
   exclude-use-default: false
