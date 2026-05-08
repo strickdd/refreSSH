@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, feat/* ]
   pull_request:
     branches: [ main ]
 
@@ -27,7 +27,10 @@ jobs:
 
   test:
     name: Test
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -35,4 +38,32 @@ jobs:
           go-version-file: 'go.mod'
           cache: true
       - name: Run tests
-        run: go test -v -p 4 ./...
+        run: go test -v -race -p 4 ./...
+
+  build:
+    name: Cross-Platform Build
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [linux, windows, darwin]
+        goarch: [amd64, arm64]
+        exclude:
+          - goos: windows
+            goarch: arm64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          BINARY_NAME=refressh
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            BINARY_NAME=refressh.exe
+          fi
+          go build -v -o "dist/${BINARY_NAME}_${{ matrix.goos }}_${{ matrix.goarch }}" ./cmd/refressh

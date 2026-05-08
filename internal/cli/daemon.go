@@ -16,7 +16,7 @@ var daemonCmd = &cobra.Command{
 var startCmd = &cobra.Command{
 	Use:   "start",
 	Short: "Start the refreSSH daemon",
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, _ []string) {
 		cfg, err := config.Load()
 		if err != nil {
 			fmt.Printf("Error loading config: %v\n", err)
