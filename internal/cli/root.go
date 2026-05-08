@@ -1,3 +1,4 @@
+// Package cli implements the command-line interface for refreSSH.
 package cli
 
 import (
@@ -11,6 +12,8 @@ var rootCmd = &cobra.Command{
 persistent terminal sessions, optimized for AI CLI agents.`,
 }
 
+// Execute adds all child commands to the root command and sets flags appropriately.
+// This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() error {
 	return rootCmd.Execute()
 }

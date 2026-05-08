@@ -1,20 +1,22 @@
+// Package config handles the persistent configuration for refreSSH.
 package config
 
 import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 )
 
 const (
-	DefaultPort                = 8080
-	DefaultAutoShutdownMinutes = 0 // 0 means no auto-shutdown
-	ConfigFileName             = "config.json"
+	// DefaultPort is the default port the API server listens on.
+	DefaultPort = 42069
+	// DefaultAutoShutdownMinutes is the default time before the daemon shuts down automatically (0 = never).
+	DefaultAutoShutdownMinutes = 0
 )
 
+// Config represents the application configuration schema.
 type Config struct {
 	Port                int    `json:"port"`
 	DefaultTerminal     string `json:"defaultTerminal"`
@@ -23,116 +25,109 @@ type Config struct {
 	AutoShutdownMinutes int    `json:"autoShutdownMinutes"`
 }
 
-// NewDefaultConfig returns a Config with default values.
+// NewDefaultConfig returns a Config struct with reasonable default values.
 func NewDefaultConfig() *Config {
 	return &Config{
 		Port:                DefaultPort,
 		DefaultTerminal:     getDefaultTerminal(),
-		PrimaryColor:        "#4A90E2", // Default blue
-		AccentColor:         "#F5A623", // Default orange
+		PrimaryColor:        "#43ED0F",
+		AccentColor:         "#ED0F43",
 		AutoShutdownMinutes: DefaultAutoShutdownMinutes,
 	}
 }
 
 func getDefaultTerminal() string {
 	if runtime.GOOS == "windows" {
-		// Check for pwsh, then powershell, then cmd
-		paths := []string{"pwsh.exe", "powershell.exe", "cmd.exe"}
-		for _, p := range paths {
-			if _, err := exec.LookPath(p); err == nil {
-				return p
-			}
-		}
-		return "cmd.exe"
+		return "pwsh.exe"
 	}
-
-	// On Unix-like systems, check SHELL environment variable first
+	// On Unix, try $SHELL before falling back to sh
 	if shell := os.Getenv("SHELL"); shell != "" {
-		if _, err := exec.LookPath(shell); err == nil {
-			return shell
-		}
+		return shell
 	}
-
-	// Fallback to common shells
-	shells := []string{"bash", "zsh", "sh"}
-	for _, s := range shells {
-		if _, err := exec.LookPath(s); err == nil {
-			return s
-		}
-	}
-
-	return "/bin/sh"
+	return "sh"
 }
 
-// GetConfigDir returns the OS-standard configuration directory path.
+// GetConfigDir returns the OS-standard configuration directory for refreSSH.
+// Windows: AppData\.refreSSH, Unix: ~/.refreSSH
 func GetConfigDir() (string, error) {
-	configDir, err := os.UserConfigDir()
+	home, err := os.UserHomeDir()
 	if err != nil {
-		return "", fmt.Errorf("failed to get user config directory: %w", err)
+		return "", fmt.Errorf("failed to get user home directory: %w", err)
 	}
 
-	return filepath.Join(configDir, "refreSSH"), nil
+	var configDir string
+	if runtime.GOOS == "windows" {
+		configDir = filepath.Join(os.Getenv("APPDATA"), ".refreSSH")
+	} else {
+		configDir = filepath.Join(home, ".refreSSH")
+	}
+
+	return configDir, nil
 }
 
-// Load loads the configuration from the standard path.
+// Load retrieves the configuration from the standard OS location.
+// If the file does not exist, it creates a default configuration.
 func Load() (*Config, error) {
 	configDir, err := GetConfigDir()
 	if err != nil {
 		return nil, err
 	}
 
-	configPath := filepath.Join(configDir, ConfigFileName)
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		return NewDefaultConfig(), nil
+	configPath := filepath.Join(configDir, "config.json")
+
+	// Ensure directory exists with secure permissions (0700)
+	if _, err := os.Stat(configDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(configDir, 0700); err != nil {
+			return nil, fmt.Errorf("failed to create config directory: %w", err)
+		}
 	}
+
+	// Address G304: Potential file inclusion via variable
+	configPath = filepath.Clean(configPath)
 
 	data, err := os.ReadFile(configPath)
 	if err != nil {
+		if os.IsNotExist(err) {
+			// Save default config if not found
+			cfg := NewDefaultConfig()
+			if err := cfg.Save(); err != nil {
+				return nil, err
+			}
+			return cfg, nil
+		}
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
-	cfg := NewDefaultConfig()
-	if err := json.Unmarshal(data, cfg); err != nil {
+	var cfg Config
+	if err := json.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("failed to parse config file: %w", err)
 	}
 
-	return cfg, nil
+	return &cfg, nil
 }
 
-// Save saves the configuration to the standard path.
+// Save persists the configuration to the standard OS location.
 func (c *Config) Save() error {
 	configDir, err := GetConfigDir()
 	if err != nil {
 		return err
 	}
 
-	// Create directory with restrictive permissions
-	if err := os.MkdirAll(configDir, 0700); err != nil {
-		return fmt.Errorf("failed to create config directory: %w", err)
-	}
+	configPath := filepath.Join(configDir, "config.json")
 
-	// Enforce directory permissions even if it already existed
-	if err := os.Chmod(configDir, 0700); err != nil {
-		// Log error but continue as this might fail on some filesystems
-		fmt.Fprintf(os.Stderr, "Warning: failed to set permissions on config directory: %v\n", err)
-	}
-
-	data, err := json.MarshalIndent(c, "", "  ")
+	data, err := json.MarshalIndent(c, "", "    ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 
-	configPath := filepath.Join(configDir, ConfigFileName)
-
-	// Write with restrictive permissions
-	err = os.WriteFile(configPath, data, 0600)
-	if err != nil {
-		return fmt.Errorf("failed to write config file: %w", err)
+	// Ensure directory exists
+	if err := os.MkdirAll(configDir, 0700); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
-	// Enforce file permissions even if it already existed
-	if err := os.Chmod(configPath, 0600); err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: failed to set permissions on config file: %v\n", err)
+	// Write file with secure permissions (0600)
+	if err := os.WriteFile(configPath, data, 0600); err != nil {
+		return fmt.Errorf("failed to write config file: %w", err)
 	}
 
 	return nil

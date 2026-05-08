@@ -2,29 +2,33 @@ package daemon
 
 import (
 	"io"
+	"os"
 	"os/exec"
 	"sync"
 )
 
-// PTY represents a pseudo-terminal session
+// PTY defines the interface for a Pseudo-Terminal or its fallback.
 type PTY interface {
 	io.ReadWriteCloser
 	Resize(rows, cols uint16) error
-	Wait() error
 }
 
-// Session manages a single PTY and its associated process
+// Session represents a single terminal session managed by the daemon.
 type Session struct {
 	id      string
-	cmd     *exec.Cmd
+	command string
+	args    []string
 	pty     PTY
-	mu      sync.Mutex
+	cmd     *exec.Cmd
 	running bool
+	mu      sync.Mutex
 }
 
+// NewSession creates a new terminal session with the given ID and command.
 func NewSession(id string, command string, args ...string) *Session {
 	return &Session{
-		id:  id,
-		cmd: exec.Command(command, args...),
+		id:      id,
+		command: command,
+		args:    args,
 	}
 }
