@@ -35,6 +35,7 @@ func (s *Session) Start() error {
 		return fmt.Errorf("session already running")
 	}
 
+	// #nosec G204 - Subprocess launching is the core purpose of refreSSH
 	c := exec.Command(s.command, s.args...)
 	f, err := pty.Start(c)
 	if err != nil {
