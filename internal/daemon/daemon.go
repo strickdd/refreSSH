@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/strickdd/refressh/internal/api"
 	"github.com/strickdd/refressh/internal/config"
 )
 
@@ -57,7 +56,12 @@ func (d *Daemon) Start() error {
 	// Start broadcasting loop
 	go d.broadcastLoop(s)
 
-	return api.Start(d.config.Port)
+	return nil
+}
+
+// Broadcaster returns the daemon's broadcaster.
+func (d *Daemon) Broadcaster() *Broadcaster {
+	return d.broadcaster
 }
 
 func (d *Daemon) broadcastLoop(s *Session) {

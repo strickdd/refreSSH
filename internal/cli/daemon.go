@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"github.com/strickdd/refressh/internal/api"
 	"github.com/strickdd/refressh/internal/config"
 	"github.com/strickdd/refressh/internal/daemon"
 )
@@ -26,6 +27,11 @@ var startCmd = &cobra.Command{
 		d := daemon.New(cfg)
 		if err := d.Start(); err != nil {
 			fmt.Printf("Error starting daemon: %v\n", err)
+			return
+		}
+
+		if err := api.Start(cfg.Port, d.Broadcaster()); err != nil {
+			fmt.Printf("Error starting API: %v\n", err)
 		}
 	},
 }
