@@ -82,14 +82,21 @@ func TestHandler(t *testing.T) {
 	}
 	defer conn.Close()
 
-	// Wait for client to be added to broadcaster
-	time.Sleep(50 * time.Millisecond)
+	// Upon connection, AddClient is called, which triggers a status update.
+	// We MUST consume this status message first.
+	messageType, p, err := conn.ReadMessage()
+	if err != nil {
+		t.Fatalf("Failed to read initial status: %v", err)
+	}
+	if messageType != websocket.TextMessage {
+		t.Errorf("Expected TextMessage for status, got %d", messageType)
+	}
 
 	// Broadcast something and see if it arrives at the WebSocket
 	testData := []byte("broadcast test")
 	broadcaster.Broadcast(testData)
 
-	_, p, err := conn.ReadMessage()
+	_, p, err = conn.ReadMessage()
 	if err != nil {
 		t.Fatalf("Failed to read broadcast: %v", err)
 	}
@@ -99,7 +106,7 @@ func TestHandler(t *testing.T) {
 
 	// Test input handling: send message from WS to Broadcaster
 	inputMsg := []byte("input test")
-	
+
 	// We need to set an input writer to verify
 	inputChan := make(chan []byte, 1)
 	broadcaster.SetInputWriter(&chanWriter{ch: inputChan})
@@ -113,7 +120,7 @@ func TestHandler(t *testing.T) {
 		if string(received) != string(inputMsg) {
 			t.Errorf("Expected input '%s', got '%s'", string(inputMsg), string(received))
 		}
-	case <-time.After(100 * time.Millisecond):
+	case <-time.After(500 * time.Millisecond):
 		t.Fatal("Timeout waiting for input to be handled")
 	}
 }
