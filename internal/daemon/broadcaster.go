@@ -1,3 +1,4 @@
+// Package daemon manages the background process, terminal sessions, and client communication.
 package daemon
 
 import (
@@ -15,6 +16,7 @@ type Client interface {
 
 // Status represents the operational state of a client (e.g., whether it is the primary controller).
 type Status struct {
+	// IsPrimary indicates if the client is the current primary controller.
 	IsPrimary bool `json:"is_primary"`
 }
 
