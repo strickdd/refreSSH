@@ -1,3 +1,4 @@
+// Package main is the entry point for the refreSSH CLI application.
 package main
 
 import (
@@ -9,7 +10,10 @@ import (
 
 func main() {
 	if err := cli.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		if _, err := fmt.Fprintln(os.Stderr, err); err != nil {
+			// Suppress error to satisfy errcheck
+			_ = err
+		}
 		os.Exit(1)
 	}
 }
