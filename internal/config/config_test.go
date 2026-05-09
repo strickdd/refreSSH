@@ -96,6 +96,7 @@ func TestSaveAndLoad(t *testing.T) {
 	}
 
 	// Test loading from custom path
+	configPath = filepath.Clean(configPath)
 	loadedData, err := os.ReadFile(configPath)
 	if err != nil {
 		t.Fatalf("failed to read config file: %v", err)
