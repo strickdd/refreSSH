@@ -1,3 +1,4 @@
+// Package daemon implements the core background process and terminal management for refreSSH.
 package daemon
 
 import (
@@ -7,8 +8,7 @@ import (
 	"github.com/strickdd/refressh/internal/config"
 )
 
-// Daemon represents the central orchestrator of refreSSH.
-// It manages the lifecycle of terminal sessions and coordinates communication with clients.
+// Daemon is the primary service that manages pseudo-terminal sessions and coordinates client broadcasting.
 type Daemon struct {
 	config      *config.Config
 	sessions    map[string]*Session
@@ -16,8 +16,7 @@ type Daemon struct {
 	mu          sync.RWMutex
 }
 
-// New creates and returns a new Daemon instance with the specified configuration.
-// If cfg is nil, the default application configuration will be used.
+// New creates and initializes a new refreSSH Daemon instance.
 func New(cfg *config.Config) *Daemon {
 	if cfg == nil {
 		cfg = config.NewDefaultConfig()
@@ -29,14 +28,14 @@ func New(cfg *config.Config) *Daemon {
 	}
 }
 
-// Start begins the daemon's operations, starting the initial terminal session and the local API server.
+// Start launches the background daemon and its local API server.
 func (d *Daemon) Start() error {
 	fmt.Println("Daemon starting...")
 
-	// Create a default session using configured terminal
+	// Create a default session for the daemon's own shell
 	s := NewSession("default", d.config.DefaultTerminal)
 	if err := s.Start(); err != nil {
-		// Fallback to sh or cmd.exe if the configured one fails
+		// Attempt fallbacks if the configured shell is unavailable
 		s = NewSession("default", "sh")
 		if err := s.Start(); err != nil {
 			s = NewSession("default", "cmd.exe")
@@ -50,10 +49,10 @@ func (d *Daemon) Start() error {
 	d.sessions[s.id] = s
 	d.mu.Unlock()
 
-	// Set the input writer so Broadcaster can forward input to the PTY
+	// Direct primary client input to the PTY
 	d.broadcaster.SetInputWriter(s.pty)
 
-	// Start broadcasting loop
+	// Start reading from PTY and broadcasting to clients
 	go d.broadcastLoop(s)
 
 	return nil

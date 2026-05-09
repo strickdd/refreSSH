@@ -18,11 +18,16 @@ const (
 
 // Config represents the application configuration schema.
 type Config struct {
-	Port                int    `json:"port"`
-	DefaultTerminal     string `json:"defaultTerminal"`
-	PrimaryColor        string `json:"primaryColor"`
-	AccentColor         string `json:"accentColor"`
-	AutoShutdownMinutes int    `json:"autoShutdownMinutes"`
+	// Port is the local TCP port the API server listens on.
+	Port int `json:"port"`
+	// DefaultTerminal is the path to the shell/terminal to use if not specified.
+	DefaultTerminal string `json:"defaultTerminal"`
+	// PrimaryColor is the hex color code for primary UI elements.
+	PrimaryColor string `json:"primaryColor"`
+	// AccentColor is the hex color code for accent UI elements.
+	AccentColor string `json:"accentColor"`
+	// AutoShutdownMinutes is the idle time in minutes before the daemon shuts down.
+	AutoShutdownMinutes int `json:"autoShutdownMinutes"`
 }
 
 // NewDefaultConfig returns a Config struct with reasonable default values.
