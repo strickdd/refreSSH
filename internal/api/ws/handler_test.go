@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -70,8 +71,21 @@ func TestWSClient(t *testing.T) {
 }
 
 func TestHandler(t *testing.T) {
-	broadcaster := daemon.NewBroadcaster()
-	handler := Handler(broadcaster)
+	d := daemon.New(nil)
+
+	// Use a command that is likely to exist on the platform.
+	cmd := "sh"
+	if runtime.GOOS == "windows" {
+		cmd = "cmd.exe"
+	}
+
+	// Create the session the test expects.
+	s, err := d.CreateSession("test-session", cmd)
+	if err != nil {
+		t.Fatalf("Failed to create session: %v", err)
+	}
+
+	handler := Handler(d)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -94,7 +108,7 @@ func TestHandler(t *testing.T) {
 
 	// Broadcast something and see if it arrives at the WebSocket
 	testData := []byte("broadcast test")
-	broadcaster.Broadcast(testData)
+	s.Broadcaster.Broadcast(testData)
 
 	_, p, err = conn.ReadMessage()
 	if err != nil {
@@ -109,7 +123,7 @@ func TestHandler(t *testing.T) {
 
 	// We need to set an input writer to verify
 	inputChan := make(chan []byte, 1)
-	broadcaster.SetInputWriter(&chanWriter{ch: inputChan})
+	s.Broadcaster.SetInputWriter(&chanWriter{ch: inputChan})
 
 	if err := conn.WriteMessage(websocket.BinaryMessage, inputMsg); err != nil {
 		t.Fatalf("Failed to write input: %v", err)

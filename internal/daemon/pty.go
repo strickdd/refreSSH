@@ -16,22 +16,24 @@ type PTY interface {
 
 // Session represents a unique, persistent terminal session managed by the daemon.
 type Session struct {
-	ID        string    `json:"id"`
-	Command   string    `json:"command"`
-	Args      []string  `json:"args"`
-	StartTime time.Time `json:"start_time"`
-	Running   bool      `json:"running"`
-	pty       PTY
-	cmd       *exec.Cmd
-	mu        sync.Mutex
+	ID          string       `json:"id"`
+	Command     string       `json:"command"`
+	Args        []string     `json:"args"`
+	StartTime   time.Time    `json:"start_time"`
+	Running     bool         `json:"running"`
+	Broadcaster *Broadcaster `json:"-"`
+	pty         PTY
+	cmd         *exec.Cmd
+	mu          sync.Mutex
 }
 
 // NewSession creates and returns a new terminal Session with the specified ID and command.
 func NewSession(id string, command string, args ...string) *Session {
 	return &Session{
-		ID:        id,
-		Command:   command,
-		Args:      args,
-		StartTime: time.Now(),
+		ID:          id,
+		Command:     command,
+		Args:        args,
+		StartTime:   time.Now(),
+		Broadcaster: NewBroadcaster(),
 	}
 }

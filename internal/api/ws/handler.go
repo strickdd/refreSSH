@@ -60,11 +60,17 @@ func (c *WSClient) SendStatus(status daemon.Status) error {
 }
 
 // Handler returns an HTTP handler for WebSocket attachment.
-func Handler(broadcaster *daemon.Broadcaster) http.HandlerFunc {
+func Handler(d *daemon.Daemon) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		sessionID := r.URL.Query().Get("id")
 		if sessionID == "" {
 			http.Error(w, "Session ID required", http.StatusBadRequest)
+			return
+		}
+
+		s, ok := d.Session(sessionID)
+		if !ok {
+			http.Error(w, "Session not found", http.StatusNotFound)
 			return
 		}
 
@@ -78,8 +84,8 @@ func Handler(broadcaster *daemon.Broadcaster) http.HandlerFunc {
 		clientID := r.RemoteAddr
 		client := NewWSClient(clientID, conn)
 
-		broadcaster.AddClient(client)
-		defer broadcaster.RemoveClient(clientID)
+		s.Broadcaster.AddClient(client)
+		defer s.Broadcaster.RemoveClient(clientID)
 
 		// Input loop: forward messages from WebSocket to Broadcaster
 		for {
@@ -87,7 +93,7 @@ func Handler(broadcaster *daemon.Broadcaster) http.HandlerFunc {
 			if err != nil {
 				break
 			}
-			_, _ = broadcaster.HandleInput(clientID, message)
+			_, _ = s.Broadcaster.HandleInput(clientID, message)
 		}
 	}
 }

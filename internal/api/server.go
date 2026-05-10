@@ -17,8 +17,22 @@ func Start(port int, d *daemon.Daemon) error {
 	addr := fmt.Sprintf("127.0.0.1:%d", port)
 	fmt.Printf("API Server starting on %s...\n", addr)
 
+	// Bind to local loopback ONLY as per GEMINI.md
+	server := &http.Server{
+		Addr:              addr,
+		Handler:           NewHandler(d),
+		ReadHeaderTimeout: 5 * time.Second, // Address G112: Potential Slowloris Attack
+	}
+
+	return server.ListenAndServe()
+}
+
+// NewHandler creates and configures the API routes, returning an http.Handler.
+func NewHandler(d *daemon.Daemon) http.Handler {
+	mux := http.NewServeMux()
+
 	// Basic health check endpoint
-	http.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
 		if _, err := fmt.Fprintf(w, "OK"); err != nil {
 			// Suppress error to satisfy errcheck
 			_ = err
@@ -26,7 +40,7 @@ func Start(port int, d *daemon.Daemon) error {
 	})
 
 	// Session list endpoint
-	http.HandleFunc("/sessions", func(w http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc("GET /sessions", func(w http.ResponseWriter, _ *http.Request) {
 		sessions := d.Sessions()
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(sessions); err != nil {
@@ -34,14 +48,54 @@ func Start(port int, d *daemon.Daemon) error {
 		}
 	})
 
-	// WebSocket attachment endpoint
-	http.HandleFunc("/attach", ws.Handler(d.Broadcaster()))
-
-	// Bind to local loopback ONLY as per GEMINI.md
-	server := &http.Server{
-		Addr:              addr,
-		ReadHeaderTimeout: 5 * time.Second, // Address G112: Potential Slowloris Attack
+	// Session creation request structure
+	type CreateSessionRequest struct {
+		ID      string   `json:"id"`
+		Command string   `json:"command"`
+		Args    []string `json:"args"`
 	}
 
-	return server.ListenAndServe()
+	// Session creation endpoint
+	mux.HandleFunc("POST /sessions", func(w http.ResponseWriter, r *http.Request) {
+		var req CreateSessionRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+
+		if req.ID == "" {
+			http.Error(w, "Session ID is required", http.StatusBadRequest)
+			return
+		}
+
+		if req.Command == "" {
+			http.Error(w, "Command is required", http.StatusBadRequest)
+			return
+		}
+
+		s, err := d.CreateSession(req.ID, req.Command, req.Args...)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(s)
+	})
+
+	// Session termination endpoint
+	mux.HandleFunc("DELETE /sessions/{id}", func(w http.ResponseWriter, r *http.Request) {
+		id := r.PathValue("id")
+		if err := d.StopSession(id); err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	// WebSocket attachment endpoint
+	mux.HandleFunc("/attach", ws.Handler(d))
+
+	return mux
 }
