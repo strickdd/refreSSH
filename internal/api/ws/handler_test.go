@@ -111,6 +111,7 @@ func TestHandler(t *testing.T) {
 	}
 
 	// Broadcast something and see if it arrives at the WebSocket
+	time.Sleep(200 * time.Millisecond) // Wait for potential shell prompts
 	testData := []byte("broadcast test")
 	s.Broadcaster.Broadcast(testData)
 

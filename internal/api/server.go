@@ -40,9 +40,7 @@ func NewHandler(d *daemon.Daemon) http.Handler {
 	mux.HandleFunc("GET /sessions", func(w http.ResponseWriter, _ *http.Request) {
 		sessions := d.Sessions()
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(sessions); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
+		_ = json.NewEncoder(w).Encode(sessions) //nolint:errcheck
 	})
 
 	// Session creation request structure

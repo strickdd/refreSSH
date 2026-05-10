@@ -40,6 +40,11 @@ func TestSessionAsyncExecution(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create session: %v", err)
 	}
+	defer func() {
+		if err := d.StopSession(sessionID); err != nil {
+			t.Logf("Warning: failed to stop session: %v", err)
+		}
+	}()
 
 	// 2. Poll for the output to be captured in the scrollback buffer
 	// This is better than a fixed sleep.
