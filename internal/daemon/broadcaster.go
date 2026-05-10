@@ -4,7 +4,6 @@ package daemon
 import (
 	"io"
 	"sync"
-	"time"
 )
 
 // Client represents a connected user or automated interface.
@@ -31,6 +30,7 @@ type clientState struct {
 	client Client
 	send   chan []byte
 	quit   chan struct{}
+	wg     sync.WaitGroup
 }
 
 // Broadcaster manages a set of connected clients and handles asynchronous PTY output distribution.
@@ -61,9 +61,12 @@ func (b *Broadcaster) SetInputWriter(w io.Writer) {
 func (b *Broadcaster) AddClient(c Client) {
 	b.mu.Lock()
 
-	// If client already exists, close the old one to avoid goroutine leaks
+	// If client already exists, close the old one and wait for it to exit
 	if oldState, ok := b.clients[c.ID()]; ok {
 		close(oldState.quit)
+		b.mu.Unlock()
+		oldState.wg.Wait()
+		b.mu.Lock()
 		delete(b.clients, c.ID())
 	}
 
@@ -78,9 +81,14 @@ func (b *Broadcaster) AddClient(c Client) {
 	if len(b.scrollback) > 0 {
 		sbCopy := make([]byte, len(b.scrollback))
 		copy(sbCopy, b.scrollback)
-		state.send <- sbCopy
+		// Non-blocking send in case buffer is somehow full (unlikely here)
+		select {
+		case state.send <- sbCopy:
+		default:
+		}
 	}
 
+	state.wg.Add(1)
 	go b.clientWriteLoop(state)
 
 	// If no primary client, make this one primary
@@ -97,6 +105,9 @@ func (b *Broadcaster) RemoveClient(id string) {
 	b.mu.Lock()
 	if state, ok := b.clients[id]; ok {
 		close(state.quit)
+		b.mu.Unlock()
+		state.wg.Wait()
+		b.mu.Lock()
 		delete(b.clients, id)
 	}
 
@@ -126,11 +137,21 @@ func (b *Broadcaster) SetPrimary(id string) {
 // Close terminates all client write loops and clears the client registry.
 func (b *Broadcaster) Close() {
 	b.mu.Lock()
-	defer b.mu.Unlock()
-	for id, state := range b.clients {
+	var states []*clientState
+	for _, state := range b.clients {
+		states = append(states, state)
 		close(state.quit)
-		delete(b.clients, id)
 	}
+	b.mu.Unlock()
+
+	for _, state := range states {
+		state.wg.Wait()
+	}
+
+	b.mu.Lock()
+	b.clients = make(map[string]*clientState)
+	b.primaryClientID = ""
+	b.mu.Unlock()
 }
 
 func (b *Broadcaster) updateClientStatuses() {
@@ -156,24 +177,12 @@ func (b *Broadcaster) updateClientStatuses() {
 }
 
 func (b *Broadcaster) clientWriteLoop(state *clientState) {
+	defer state.wg.Done()
 	for {
 		select {
 		case data := <-state.send:
-			// Ensure write doesn't block indefinitely
-			done := make(chan struct{})
-			go func() {
-				if _, err := state.client.Write(data); err != nil {
-					// Connection likely closed
-				}
-				close(done)
-			}()
-
-			select {
-			case <-done:
-				// Write completed
-			case <-time.After(5 * time.Second):
-				// Write timed out
-			case <-state.quit:
+			if _, err := state.client.Write(data); err != nil {
+				// Connection likely closed
 				return
 			}
 		case <-state.quit:

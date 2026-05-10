@@ -52,9 +52,20 @@ func getDefaultTerminal() string {
 	return "sh"
 }
 
+var configDirOverride string
+
+// SetConfigDirOverride sets a custom directory for configuration files, primarily for testing.
+func SetConfigDirOverride(dir string) {
+	configDirOverride = dir
+}
+
 // GetConfigDir returns the OS-standard configuration directory for refreSSH.
 // Windows: AppData\.refreSSH, Unix: ~/.refreSSH
 func GetConfigDir() (string, error) {
+	if configDirOverride != "" {
+		return configDirOverride, nil
+	}
+
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("failed to get user home directory: %w", err)
@@ -62,7 +73,11 @@ func GetConfigDir() (string, error) {
 
 	var configDir string
 	if runtime.GOOS == "windows" {
-		configDir = filepath.Join(os.Getenv("APPDATA"), ".refreSSH")
+		appData := os.Getenv("APPDATA")
+		if appData == "" {
+			return "", fmt.Errorf("APPDATA environment variable not set")
+		}
+		configDir = filepath.Join(appData, ".refreSSH")
 	} else {
 		configDir = filepath.Join(home, ".refreSSH")
 	}

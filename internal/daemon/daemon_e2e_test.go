@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -16,7 +17,7 @@ func TestSessionAsyncExecution(t *testing.T) {
 	cfg := config.NewDefaultConfig()
 	d := New(cfg)
 
-	// 1. Create a session that prints a marker immediately and then waits
+	// 1. Create a session that prints a marker
 	sessionID := "e2e-async-test"
 	cmd := "echo"
 	args := []string{"ASYNC_MARKER"}
@@ -30,23 +31,29 @@ func TestSessionAsyncExecution(t *testing.T) {
 		t.Fatalf("Failed to create session: %v", err)
 	}
 
-	// 2. Wait for the command to likely finish and output to be captured
-	time.Sleep(2 * time.Second)
+	// 2. Poll for the output to be captured in the scrollback buffer
+	// This is better than a fixed sleep.
+	found := false
+	for i := 0; i < 20; i++ {
+		d.mu.RLock()
+		scrollbackContent := string(s.Broadcaster.scrollback)
+		d.mu.RUnlock()
 
-	// 3. Check scrollback buffer directly first for debugging
-	d.mu.RLock()
-	scrollbackSize := len(s.Broadcaster.scrollback)
-	scrollbackContent := string(s.Broadcaster.scrollback)
-	d.mu.RUnlock()
+		if strings.Contains(scrollbackContent, "ASYNC_MARKER") {
+			found = true
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
 
-	t.Logf("Scrollback size: %d", scrollbackSize)
-	t.Logf("Scrollback content: %q", scrollbackContent)
-
-	if !strings.Contains(scrollbackContent, "ASYNC_MARKER") {
+	if !found {
+		d.mu.RLock()
+		scrollbackContent := string(s.Broadcaster.scrollback)
+		d.mu.RUnlock()
 		t.Errorf("Expected 'ASYNC_MARKER' in scrollback, got: %q", scrollbackContent)
 	}
 
-	// 4. Attach a mock client and check if the marker is delivered
+	// 3. Attach a mock client and check if the marker is delivered
 	mockClient := &mockWSClient{id: "mock-client", output: make(chan []byte, 10)}
 	s.Broadcaster.AddClient(mockClient)
 
@@ -55,7 +62,7 @@ func TestSessionAsyncExecution(t *testing.T) {
 		if !strings.Contains(string(data), "ASYNC_MARKER") {
 			t.Errorf("Expected 'ASYNC_MARKER' in delivered data, got: %s", string(data))
 		}
-	case <-time.After(1 * time.Second):
+	case <-time.After(2 * time.Second):
 		t.Fatal("Timed out waiting for mock client to receive scrollback")
 	}
 
@@ -74,14 +81,9 @@ func TestMetadataPersistence(t *testing.T) {
 	}
 	defer os.RemoveAll(tempDir)
 
-	// Override GetConfigDir behavior by setting environment variables if possible,
-	// or we can just manually call saveState/loadState with a modified path if the code allowed.
-	// Since GetConfigDir is package-level and uses os.UserHomeDir/APPDATA, we'll
-	// mock the logic by checking if we can influence the config package.
-	
-	// For this test, we'll verify the logic of saveState/loadState directly
-	// by ensuring they produce/consume the expected JSON.
-	
+	config.SetConfigDirOverride(tempDir)
+	defer config.SetConfigDirOverride("") // Reset after test
+
 	cfg := config.NewDefaultConfig()
 	d := New(cfg)
 
@@ -104,13 +106,20 @@ func TestMetadataPersistence(t *testing.T) {
 		t.Errorf("Expected 1 session, got %d", len(sessions))
 	}
 
+	// Verify file exists in temp dir
+	statePath := filepath.Join(tempDir, "sessions.json")
+	if _, err := os.Stat(statePath); os.IsNotExist(err) {
+		t.Error("sessions.json was not created in the temporary directory")
+	}
+
 	// Simulate "crash" by creating a new daemon and loading state
-	// We need to ensure the config directory is the same.
-	// This is tricky without refactoring GetConfigDir to be injectable.
-	// For now, let's at least verify that saveState doesn't error.
-	err = d.saveState()
-	if err != nil {
-		t.Errorf("saveState failed: %v", err)
+	d2 := New(cfg)
+	if err := d2.loadState(); err != nil {
+		t.Fatalf("loadState failed: %v", err)
+	}
+
+	if len(d2.Sessions()) != 1 {
+		t.Errorf("Expected 1 session to be loaded, got %d", len(d2.Sessions()))
 	}
 }
 

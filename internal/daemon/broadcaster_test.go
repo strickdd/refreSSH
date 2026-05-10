@@ -222,21 +222,33 @@ func TestBroadcaster_DropData(t *testing.T) {
 
 func TestBroadcaster_Close(t *testing.T) {
 	b := NewBroadcaster()
+	
 	c := newMockClient("c")
+	c.WriteFunc = func(p []byte) (int, error) {
+		return len(p), nil
+	}
+	
 	b.AddClient(c)
-
+	
 	b.Close()
 
-	// Wait a bit for the goroutine to exit
-	time.Sleep(10 * time.Millisecond)
-
+	// Wait for the client loop to exit (wg.Wait() is called inside Close())
+	// But we can double check by trying to send something and ensuring it's not received.
+	
 	b.Broadcast([]byte("test"))
 
-	// c should not receive anything because its loop is closed
 	select {
 	case <-c.written:
 		t.Error("Client received message after broadcaster was closed")
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(100 * time.Millisecond):
 		// Success
+	}
+
+	// Verify clients map is cleared
+	b.mu.RLock()
+	count := len(b.clients)
+	b.mu.RUnlock()
+	if count != 0 {
+		t.Errorf("Expected 0 clients after Close, got %d", count)
 	}
 }
