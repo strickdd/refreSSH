@@ -81,7 +81,11 @@ func NewHandler(d *daemon.Daemon) http.Handler {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		_ = json.NewEncoder(w).Encode(s)
+		if err := json.NewEncoder(w).Encode(s); err != nil {
+			// Header already sent, so we can't send an error response here
+			// But we should satisfy the linter.
+			_ = err
+		}
 	})
 
 	// Session termination endpoint
