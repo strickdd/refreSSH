@@ -30,11 +30,11 @@ func (s *Session) Start() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.running {
+	if s.Running {
 		return fmt.Errorf("session already running")
 	}
 
-	c := exec.Command(s.command, s.args...)
+	c := exec.Command(s.Command, s.Args...)
 
 	stdin, err := c.StdinPipe()
 	if err != nil {
@@ -55,7 +55,7 @@ func (s *Session) Start() error {
 
 	s.cmd = c
 	s.pty = &pipePTY{stdin: stdin, stdout: stdout}
-	s.running = true
+	s.Running = true
 
 	return nil
 }

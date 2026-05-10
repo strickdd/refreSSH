@@ -30,7 +30,7 @@ var startCmd = &cobra.Command{
 			return
 		}
 
-		if err := api.Start(cfg.Port, d.Broadcaster()); err != nil {
+		if err := api.Start(cfg.Port, d); err != nil {
 			fmt.Printf("Error starting API: %v\n", err)
 		}
 	},

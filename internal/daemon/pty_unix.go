@@ -31,12 +31,12 @@ func (s *Session) Start() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.running {
+	if s.Running {
 		return fmt.Errorf("session already running")
 	}
 
 	// #nosec G204 - Subprocess launching is the core purpose of refreSSH
-	c := exec.Command(s.command, s.args...)
+	c := exec.Command(s.Command, s.Args...)
 	f, err := pty.Start(c)
 	if err != nil {
 		return fmt.Errorf("failed to start pty: %w", err)
@@ -44,7 +44,7 @@ func (s *Session) Start() error {
 
 	s.cmd = c
 	s.pty = &unixPTY{f: f}
-	s.running = true
+	s.Running = true
 
 	return nil
 }

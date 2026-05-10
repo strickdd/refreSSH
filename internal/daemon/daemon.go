@@ -46,7 +46,7 @@ func (d *Daemon) Start() error {
 	}
 
 	d.mu.Lock()
-	d.sessions[s.id] = s
+	d.sessions[s.ID] = s
 	d.mu.Unlock()
 
 	// Direct primary client input to the PTY
@@ -63,10 +63,22 @@ func (d *Daemon) Broadcaster() *Broadcaster {
 	return d.broadcaster
 }
 
+// Sessions returns a list of all currently managed sessions.
+func (d *Daemon) Sessions() []*Session {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+
+	sessions := make([]*Session, 0, len(d.sessions))
+	for _, s := range d.sessions {
+		sessions = append(sessions, s)
+	}
+	return sessions
+}
+
 func (d *Daemon) broadcastLoop(s *Session) {
 	defer func() {
 		s.mu.Lock()
-		s.running = false
+		s.Running = false
 		if s.pty != nil {
 			_ = s.pty.Close()
 		}
