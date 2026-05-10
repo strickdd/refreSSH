@@ -10,12 +10,10 @@ import (
 type Client interface {
 	io.Writer
 	ID() string
-	SendStatus(status Status) error
+	SendStatus(Status) error
 }
 
-// Status represents the operational state of a client (e.g., whether it is the primary controller).
 type Status struct {
-	// IsPrimary indicates if the client is the current primary controller.
 	IsPrimary bool `json:"is_primary"`
 }
 
@@ -86,11 +84,7 @@ func (b *Broadcaster) AddClient(c Client) {
 	if len(b.scrollback) > 0 {
 		sbCopy := make([]byte, len(b.scrollback))
 		copy(sbCopy, b.scrollback)
-		// Non-blocking send in case buffer is somehow full (unlikely here)
-		select {
-		case state.send <- sbCopy:
-		default:
-		}
+		state.send <- sbCopy
 	}
 
 	state.wg.Add(1)
@@ -193,7 +187,6 @@ func (b *Broadcaster) clientWriteLoop(state *clientState) {
 		select {
 		case data := <-state.send:
 			if _, err := state.client.Write(data); err != nil {
-				// Connection likely closed
 				return
 			}
 		case <-state.quit:
@@ -227,6 +220,11 @@ func (b *Broadcaster) Broadcast(data []byte) {
 	copy(dataCopy, data)
 
 	b.mu.Lock()
+	if b.closed {
+		b.mu.Unlock()
+		return
+	}
+
 	// Update scrollback buffer
 	b.scrollback = append(b.scrollback, dataCopy...)
 	if len(b.scrollback) > maxScrollbackSize {
@@ -259,7 +257,7 @@ func (b *Broadcaster) Broadcast(data []byte) {
 	}
 }
 
-// HandleInput forwards input from a specific client to the registered input writer if the client is the primary.
+// HandleInput routes input from a specific client to the designated PTY writer.
 func (b *Broadcaster) HandleInput(clientID string, data []byte) (int, error) {
 	b.mu.RLock()
 	isPrimary := clientID == b.primaryClientID
