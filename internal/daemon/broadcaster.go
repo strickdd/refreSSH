@@ -23,6 +23,8 @@ type Status struct {
 const (
 	// clientBufferSize is the number of messages to buffer per client before dropping data.
 	clientBufferSize = 256
+	// maxScrollbackSize is the maximum number of bytes to keep in the scrollback buffer.
+	maxScrollbackSize = 64 * 1024
 )
 
 type clientState struct {
@@ -36,13 +38,15 @@ type Broadcaster struct {
 	clients         map[string]*clientState
 	primaryClientID string
 	inputWriter     io.Writer
+	scrollback      []byte
 	mu              sync.RWMutex
 }
 
 // NewBroadcaster creates and initializes a new Broadcaster instance.
 func NewBroadcaster() *Broadcaster {
 	return &Broadcaster{
-		clients: make(map[string]*clientState),
+		clients:    make(map[string]*clientState),
+		scrollback: make([]byte, 0, maxScrollbackSize),
 	}
 }
 
@@ -69,6 +73,13 @@ func (b *Broadcaster) AddClient(c Client) {
 		quit:   make(chan struct{}),
 	}
 	b.clients[c.ID()] = state
+
+	// Send current scrollback to the new client first
+	if len(b.scrollback) > 0 {
+		sbCopy := make([]byte, len(b.scrollback))
+		copy(sbCopy, b.scrollback)
+		state.send <- sbCopy
+	}
 
 	go b.clientWriteLoop(state)
 
@@ -179,12 +190,20 @@ func (b *Broadcaster) Broadcast(data []byte) {
 	dataCopy := make([]byte, len(data))
 	copy(dataCopy, data)
 
-	b.mu.RLock()
+	b.mu.Lock()
+	// Update scrollback buffer
+	b.scrollback = append(b.scrollback, dataCopy...)
+	if len(b.scrollback) > maxScrollbackSize {
+		// Truncate from the beginning to maintain size
+		excess := len(b.scrollback) - maxScrollbackSize
+		b.scrollback = b.scrollback[excess:]
+	}
+
 	var states []*clientState
 	for _, state := range b.clients {
 		states = append(states, state)
 	}
-	b.mu.RUnlock()
+	b.mu.Unlock()
 
 	for _, state := range states {
 		select {
