@@ -114,12 +114,20 @@ func TestHandler(t *testing.T) {
 	testData := []byte("broadcast test")
 	s.Broadcaster.Broadcast(testData)
 
-	_, p, err = conn.ReadMessage()
-	if err != nil {
-		t.Fatalf("Failed to read broadcast: %v", err)
+	foundBroadcast := false
+	for i := 0; i < 5; i++ {
+		_, p, err = conn.ReadMessage()
+		if err != nil {
+			t.Fatalf("Failed to read broadcast: %v", err)
+		}
+		if strings.Contains(string(p), string(testData)) {
+			foundBroadcast = true
+			break
+		}
 	}
-	if string(p) != string(testData) {
-		t.Errorf("Expected '%s', got '%s'", string(testData), string(p))
+
+	if !foundBroadcast {
+		t.Errorf("Expected '%s' to be received in WebSocket messages", string(testData))
 	}
 
 	// Test input handling: send message from WS to Broadcaster

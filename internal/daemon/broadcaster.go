@@ -40,6 +40,7 @@ type Broadcaster struct {
 	inputWriter     io.Writer
 	scrollback      []byte
 	mu              sync.RWMutex
+	closed          bool
 }
 
 // NewBroadcaster creates and initializes a new Broadcaster instance.
@@ -60,6 +61,10 @@ func (b *Broadcaster) SetInputWriter(w io.Writer) {
 // AddClient registers a new client with the broadcaster and starts its individual write loop.
 func (b *Broadcaster) AddClient(c Client) {
 	b.mu.Lock()
+	if b.closed {
+		b.mu.Unlock()
+		return
+	}
 
 	// If client already exists, close the old one and wait for it to exit
 	if oldState, ok := b.clients[c.ID()]; ok {
@@ -137,6 +142,12 @@ func (b *Broadcaster) SetPrimary(id string) {
 // Close terminates all client write loops and clears the client registry.
 func (b *Broadcaster) Close() {
 	b.mu.Lock()
+	if b.closed {
+		b.mu.Unlock()
+		return
+	}
+	b.closed = true
+
 	var states []*clientState
 	for _, state := range b.clients {
 		states = append(states, state)
