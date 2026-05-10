@@ -131,13 +131,13 @@ func (d *Daemon) StopSession(id string) error {
 	if s.Running {
 		if s.cmd != nil && s.cmd.Process != nil {
 			// Try to terminate gracefully, then kill
-			_ = s.cmd.Process.Kill()
+			_ = s.cmd.Process.Kill() //nolint:errcheck
 		}
 		s.Running = false
 	}
 
 	if s.pty != nil {
-		_ = s.pty.Close()
+		_ = s.pty.Close() //nolint:errcheck
 	}
 
 	s.Broadcaster.Close()
@@ -150,6 +150,11 @@ func (d *Daemon) saveState() error {
 	configDir, err := config.GetConfigDir()
 	if err != nil {
 		return err
+	}
+
+	// Ensure directory exists
+	if err := os.MkdirAll(configDir, 0700); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
 	statePath := filepath.Join(configDir, "sessions.json")
@@ -228,10 +233,10 @@ func (d *Daemon) broadcastLoop(s *Session) {
 		if s.Running {
 			s.Running = false
 			if s.pty != nil {
-				_ = s.pty.Close()
+				_ = s.pty.Close() //nolint:errcheck
 			}
 			if s.cmd != nil && s.cmd.Process != nil {
-				_ = s.cmd.Wait()
+				_ = s.cmd.Wait() //nolint:errcheck
 			}
 		}
 		s.mu.Unlock()

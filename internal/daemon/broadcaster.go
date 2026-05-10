@@ -191,6 +191,20 @@ func (b *Broadcaster) clientWriteLoop(state *clientState) {
 	}
 }
 
+// Scrollback returns a copy of the current scrollback buffer.
+func (b *Broadcaster) Scrollback() []byte {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	if len(b.scrollback) == 0 {
+		return nil
+	}
+
+	sbCopy := make([]byte, len(b.scrollback))
+	copy(sbCopy, b.scrollback)
+	return sbCopy
+}
+
 // Broadcast distributes a copy of the data slice to all currently registered clients.
 func (b *Broadcaster) Broadcast(data []byte) {
 	if len(data) == 0 {

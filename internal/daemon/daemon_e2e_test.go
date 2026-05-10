@@ -14,6 +14,16 @@ import (
 // TestSessionAsyncExecution verifies that a process continues running and its output
 // is captured in the scrollback buffer even when no clients are attached.
 func TestSessionAsyncExecution(t *testing.T) {
+	// Use a temporary config directory to avoid messing with user data
+	tempDir, err := os.MkdirTemp("", "refressh-async-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	config.SetConfigDirOverride(tempDir)
+	defer config.SetConfigDirOverride("") // Reset after test
+
 	cfg := config.NewDefaultConfig()
 	d := New(cfg)
 
@@ -35,9 +45,7 @@ func TestSessionAsyncExecution(t *testing.T) {
 	// This is better than a fixed sleep.
 	found := false
 	for i := 0; i < 20; i++ {
-		d.mu.RLock()
-		scrollbackContent := string(s.Broadcaster.scrollback)
-		d.mu.RUnlock()
+		scrollbackContent := string(s.Broadcaster.Scrollback())
 
 		if strings.Contains(scrollbackContent, "ASYNC_MARKER") {
 			found = true
@@ -47,9 +55,7 @@ func TestSessionAsyncExecution(t *testing.T) {
 	}
 
 	if !found {
-		d.mu.RLock()
-		scrollbackContent := string(s.Broadcaster.scrollback)
-		d.mu.RUnlock()
+		scrollbackContent := string(s.Broadcaster.Scrollback())
 		t.Errorf("Expected 'ASYNC_MARKER' in scrollback, got: %q", scrollbackContent)
 	}
 
