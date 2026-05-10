@@ -29,7 +29,7 @@ var (
 			BorderForeground(lipgloss.Color("62"))
 )
 
-func (m model) View() string {
+func (m Model) View() string {
 	if m.width == 0 || m.height == 0 {
 		return "Initializing..."
 	}
