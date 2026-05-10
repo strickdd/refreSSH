@@ -10,10 +10,7 @@ import (
 
 func main() {
 	if err := cli.Execute(); err != nil {
-		if _, err := fmt.Fprintln(os.Stderr, err); err != nil {
-			// Suppress error to satisfy errcheck
-			_ = err
-		}
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err) //nolint:errcheck
 		os.Exit(1)
 	}
 }

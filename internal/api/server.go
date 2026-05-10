@@ -33,10 +33,7 @@ func NewHandler(d *daemon.Daemon) http.Handler {
 
 	// Basic health check endpoint
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
-		if _, err := fmt.Fprintf(w, "OK"); err != nil {
-			// Suppress error to satisfy errcheck
-			_ = err
-		}
+		_, _ = fmt.Fprintf(w, "OK") //nolint:errcheck
 	})
 
 	// Session list endpoint
@@ -81,11 +78,7 @@ func NewHandler(d *daemon.Daemon) http.Handler {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		if err := json.NewEncoder(w).Encode(s); err != nil {
-			// Header already sent, so we can't send an error response here
-			// But we should satisfy the linter.
-			_ = err
-		}
+		_ = json.NewEncoder(w).Encode(s) //nolint:errcheck
 	})
 
 	// Session termination endpoint

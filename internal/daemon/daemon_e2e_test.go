@@ -59,7 +59,9 @@ func TestSessionAsyncExecution(t *testing.T) {
 		t.Fatal("Timed out waiting for mock client to receive scrollback")
 	}
 
-	_ = d.StopSession(sessionID)
+	if err := d.StopSession(sessionID); err != nil {
+		t.Logf("Warning: failed to stop session: %v", err)
+	}
 }
 
 // TestMetadataPersistence verifies that session metadata is saved to disk and

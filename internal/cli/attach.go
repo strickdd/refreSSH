@@ -41,7 +41,9 @@ var attachCmd = &cobra.Command{
 			return
 		}
 		defer func() {
-			_ = term.Restore(int(os.Stdin.Fd()), oldState)
+			if err := term.Restore(int(os.Stdin.Fd()), oldState); err != nil {
+				fmt.Printf("\nError restoring terminal: %v\n", err)
+			}
 		}()
 
 		// Channel to catch interrupt signals
@@ -58,7 +60,10 @@ var attachCmd = &cobra.Command{
 					return
 				}
 				// Output is usually binary PTY data
-				_, _ = os.Stdout.Write(message)
+				_, err = os.Stdout.Write(message)
+				if err != nil {
+					return
+				}
 			}
 		}()
 

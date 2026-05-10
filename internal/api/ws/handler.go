@@ -93,7 +93,10 @@ func Handler(d *daemon.Daemon) http.HandlerFunc {
 			if err != nil {
 				break
 			}
-			_, _ = s.Broadcaster.HandleInput(clientID, message)
+			if _, err := s.Broadcaster.HandleInput(clientID, message); err != nil {
+				// Failed to handle input, possibly due to writer issues
+				break
+			}
 		}
 	}
 }

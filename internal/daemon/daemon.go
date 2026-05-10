@@ -99,7 +99,9 @@ func (d *Daemon) CreateSession(id string, command string, args ...string) (*Sess
 	d.mu.Unlock()
 
 	// Persist state
-	_ = d.saveState()
+	if err := d.saveState(); err != nil {
+		fmt.Printf("Warning: failed to save session state: %v\n", err)
+	}
 
 	// Start reading from PTY and broadcasting to clients
 	go d.broadcastLoop(s)
@@ -119,7 +121,9 @@ func (d *Daemon) StopSession(id string) error {
 	d.mu.Unlock()
 
 	// Persist state
-	_ = d.saveState()
+	if err := d.saveState(); err != nil {
+		fmt.Printf("Warning: failed to save session state: %v\n", err)
+	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -17,7 +17,7 @@ type pipePTY struct {
 func (p *pipePTY) Read(b []byte) (int, error)  { return p.stdout.Read(b) }
 func (p *pipePTY) Write(b []byte) (int, error) { return p.stdin.Write(b) }
 func (p *pipePTY) Close() error {
-	_ = p.stdin.Close()
+	_ = p.stdin.Close() //nolint:errcheck
 	return p.stdout.Close()
 }
 
@@ -43,13 +43,13 @@ func (s *Session) Start() error {
 
 	stdout, err := c.StdoutPipe()
 	if err != nil {
-		_ = stdin.Close()
+		_ = stdin.Close() //nolint:errcheck
 		return fmt.Errorf("failed to create stdout pipe: %w", err)
 	}
 
 	if err := c.Start(); err != nil {
-		_ = stdin.Close()
-		_ = stdout.Close()
+		_ = stdin.Close()  //nolint:errcheck
+		_ = stdout.Close() //nolint:errcheck
 		return fmt.Errorf("failed to start process: %w", err)
 	}
 

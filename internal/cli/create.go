@@ -42,7 +42,10 @@ var createCmd = &cobra.Command{
 
 		if resp.StatusCode == http.StatusCreated {
 			var s daemon.Session
-			_ = json.NewDecoder(resp.Body).Decode(&s)
+			if err := json.NewDecoder(resp.Body).Decode(&s); err != nil {
+				fmt.Printf("Session created, but failed to decode response: %v\n", err)
+				return
+			}
 			fmt.Printf("Session '%s' created successfully.\n", s.ID)
 		} else {
 			fmt.Printf("Error creating session: %s\n", resp.Status)

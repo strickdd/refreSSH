@@ -151,7 +151,7 @@ func (b *Broadcaster) updateClientStatuses() {
 	for _, t := range targets {
 		_ = t.c.SendStatus(Status{
 			IsPrimary: t.isPrimary,
-		})
+		}) //nolint:errcheck
 	}
 }
 
@@ -162,7 +162,9 @@ func (b *Broadcaster) clientWriteLoop(state *clientState) {
 			// Ensure write doesn't block indefinitely
 			done := make(chan struct{})
 			go func() {
-				_, _ = state.client.Write(data)
+				if _, err := state.client.Write(data); err != nil {
+					// Connection likely closed
+				}
 				close(done)
 			}()
 

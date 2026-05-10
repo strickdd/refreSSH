@@ -26,10 +26,14 @@ func TestWSClient(t *testing.T) {
 		client := NewWSClient("test-client", conn)
 
 		// Test Write (BinaryMessage)
-		_, _ = client.Write([]byte("binary data"))
+		if _, err := client.Write([]byte("binary data")); err != nil {
+			return
+		}
 
 		// Test SendStatus (TextMessage)
-		_ = client.SendStatus(daemon.Status{IsPrimary: true})
+		if err := client.SendStatus(daemon.Status{IsPrimary: true}); err != nil {
+			return
+		}
 	}))
 	defer s.Close()
 

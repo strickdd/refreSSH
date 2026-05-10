@@ -121,12 +121,18 @@ func TestBroadcaster(t *testing.T) {
 	}
 
 	// Test Input Handling
-	n, _ := b.HandleInput("client1", []byte("bad"))
+	n, err := b.HandleInput("client1", []byte("bad"))
+	if err != nil {
+		t.Fatalf("HandleInput failed: %v", err)
+	}
 	if n != 0 {
 		t.Error("Non-primary client should not be able to send input")
 	}
 
-	n, _ = b.HandleInput("client2", []byte("good"))
+	n, err = b.HandleInput("client2", []byte("good"))
+	if err != nil {
+		t.Fatalf("HandleInput failed: %v", err)
+	}
 	if n != 4 {
 		t.Error("Primary client should be able to send input")
 	}
