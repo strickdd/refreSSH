@@ -2,7 +2,10 @@
 package daemon
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/strickdd/refressh/internal/config"
@@ -30,16 +33,44 @@ func New(cfg *config.Config) *Daemon {
 func (d *Daemon) Start() error {
 	fmt.Println("Daemon starting...")
 
-	// Create a default session for the daemon's own shell
-	_, err := d.CreateSession("default", d.config.DefaultTerminal)
-	if err != nil {
-		// Attempt fallbacks if the configured shell is unavailable
-		_, err = d.CreateSession("default", "sh")
+	// Attempt to recover previous sessions
+	if err := d.loadState(); err != nil {
+		fmt.Printf("Warning: failed to load previous session state: %v\n", err)
+	}
+
+	// Create a default session if no sessions exist
+	d.mu.RLock()
+	sessionCount := len(d.sessions)
+	d.mu.RUnlock()
+
+	if sessionCount == 0 {
+		_, err := d.CreateSession("default", d.config.DefaultTerminal)
 		if err != nil {
-			_, err = d.CreateSession("default", "cmd.exe")
+			// Attempt fallbacks if the configured shell is unavailable
+			_, err = d.CreateSession("default", "sh")
 			if err != nil {
-				return fmt.Errorf("failed to start any shell: %w", err)
+				_, err = d.CreateSession("default", "cmd.exe")
+				if err != nil {
+					return fmt.Errorf("failed to start any shell: %w", err)
+				}
 			}
+		}
+	} else {
+		// Restart recovered sessions
+		d.mu.RLock()
+		var sessionsToRestart []*Session
+		for _, s := range d.sessions {
+			sessionsToRestart = append(sessionsToRestart, s)
+		}
+		d.mu.RUnlock()
+
+		for _, s := range sessionsToRestart {
+			if err := s.Start(); err != nil {
+				fmt.Printf("Warning: failed to restart session %s: %v\n", s.ID, err)
+				continue
+			}
+			s.Broadcaster.SetInputWriter(s.pty)
+			go d.broadcastLoop(s)
 		}
 	}
 
@@ -67,6 +98,9 @@ func (d *Daemon) CreateSession(id string, command string, args ...string) (*Sess
 	d.sessions[id] = s
 	d.mu.Unlock()
 
+	// Persist state
+	_ = d.saveState()
+
 	// Start reading from PTY and broadcasting to clients
 	go d.broadcastLoop(s)
 
@@ -84,6 +118,9 @@ func (d *Daemon) StopSession(id string) error {
 	delete(d.sessions, id)
 	d.mu.Unlock()
 
+	// Persist state
+	_ = d.saveState()
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -100,6 +137,63 @@ func (d *Daemon) StopSession(id string) error {
 	}
 
 	s.Broadcaster.Close()
+
+	return nil
+}
+
+// saveState persists the current list of sessions to disk.
+func (d *Daemon) saveState() error {
+	configDir, err := config.GetConfigDir()
+	if err != nil {
+		return err
+	}
+
+	statePath := filepath.Join(configDir, "sessions.json")
+
+	d.mu.RLock()
+	sessions := make([]*Session, 0, len(d.sessions))
+	for _, s := range d.sessions {
+		sessions = append(sessions, s)
+	}
+	d.mu.RUnlock()
+
+	data, err := json.MarshalIndent(sessions, "", "    ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(statePath, data, 0600)
+}
+
+// loadState reads the session list from disk.
+func (d *Daemon) loadState() error {
+	configDir, err := config.GetConfigDir()
+	if err != nil {
+		return err
+	}
+
+	statePath := filepath.Join(configDir, "sessions.json")
+	data, err := os.ReadFile(statePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+
+	var sessions []*Session
+	if err := json.Unmarshal(data, &sessions); err != nil {
+		return err
+	}
+
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	for _, s := range sessions {
+		// Initialize broadcaster and other non-serialized fields
+		s.Broadcaster = NewBroadcaster()
+		s.Running = false // Will be set to true if successfully restarted
+		d.sessions[s.ID] = s
+	}
 
 	return nil
 }
