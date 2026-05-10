@@ -1,3 +1,4 @@
+// Package ws provides WebSocket-based terminal attachment handlers.
 package ws
 
 import (
@@ -10,35 +11,34 @@ import (
 )
 
 var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
+	CheckOrigin: func(_ *http.Request) bool {
 		// Strictly local-only as per GEMINI.md, but ListenAndServe on 127.0.0.1 handles this.
-		// For extra safety, we could check r.RemoteAddr.
 		return true
 	},
 }
 
-// WSClient wraps a WebSocket connection to satisfy the daemon.Client interface.
-type WSClient struct {
+// Client wraps a WebSocket connection to satisfy the daemon.Client interface.
+type Client struct {
 	id   string
 	conn *websocket.Conn
 	mu   sync.Mutex
 }
 
-// NewWSClient creates a new WSClient instance.
-func NewWSClient(id string, conn *websocket.Conn) *WSClient {
-	return &WSClient{
+// NewWSClient creates a new Client instance.
+func NewWSClient(id string, conn *websocket.Conn) *Client {
+	return &Client{
 		id:   id,
 		conn: conn,
 	}
 }
 
 // ID returns the unique identifier for the client.
-func (c *WSClient) ID() string {
+func (c *Client) ID() string {
 	return c.id
 }
 
 // Write sends binary data (PTY output) to the WebSocket client.
-func (c *WSClient) Write(p []byte) (n int, err error) {
+func (c *Client) Write(p []byte) (n int, err error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	err = c.conn.WriteMessage(websocket.BinaryMessage, p)
@@ -49,7 +49,7 @@ func (c *WSClient) Write(p []byte) (n int, err error) {
 }
 
 // SendStatus sends a status update to the client as a JSON message.
-func (c *WSClient) SendStatus(status daemon.Status) error {
+func (c *Client) SendStatus(status daemon.Status) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	data, err := json.Marshal(status)
@@ -78,7 +78,7 @@ func Handler(d *daemon.Daemon) http.HandlerFunc {
 		if err != nil {
 			return
 		}
-		defer conn.Close()
+		defer conn.Close() //nolint:errcheck
 
 		// Use remote address as client ID for uniqueness within this session
 		clientID := r.RemoteAddr

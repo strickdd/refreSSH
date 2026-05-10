@@ -8,12 +8,19 @@ import (
 type Action int
 
 const (
+	// ActionNone represents no action.
 	ActionNone Action = iota
+	// ActionQuit quits the application.
 	ActionQuit
+	// ActionNextTab moves to the next tab.
 	ActionNextTab
+	// ActionPrevTab moves to the previous tab.
 	ActionPrevTab
+	// ActionNewTab creates a new tab.
 	ActionNewTab
+	// ActionCloseTab closes the current tab.
 	ActionCloseTab
+	// ActionSendPrefix sends the prefix key to the PTY.
 	ActionSendPrefix // Special action to send the prefix key itself
 )
 

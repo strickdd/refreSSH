@@ -13,6 +13,7 @@ type Client interface {
 	SendStatus(Status) error
 }
 
+// Status represents the current connection state of a client.
 type Status struct {
 	IsPrimary bool `json:"is_primary"`
 }

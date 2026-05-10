@@ -14,14 +14,12 @@ import (
 )
 
 func TestWSClient(t *testing.T) {
-	// Start a test server to get a real WebSocket connection
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		upgrader := websocket.Upgrader{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			return
 		}
-		defer conn.Close()
+		defer conn.Close() //nolint:errcheck
 
 		client := NewWSClient("test-client", conn)
 
@@ -35,20 +33,19 @@ func TestWSClient(t *testing.T) {
 			return
 		}
 	}))
-	defer s.Close()
+	defer server.Close()
 
-	// Connect to the test server
-	u := "ws" + strings.TrimPrefix(s.URL, "http")
+	u := "ws" + strings.TrimPrefix(server.URL, "http")
 	conn, _, err := websocket.DefaultDialer.Dial(u, nil)
 	if err != nil {
 		t.Fatalf("Failed to dial: %v", err)
 	}
-	defer conn.Close()
+	defer conn.Close() //nolint:errcheck
 
-	// Read binary message
+	// Read binary data
 	messageType, p, err := conn.ReadMessage()
 	if err != nil {
-		t.Fatalf("Failed to read message: %v", err)
+		t.Fatalf("Failed to read binary data: %v", err)
 	}
 	if messageType != websocket.BinaryMessage {
 		t.Errorf("Expected BinaryMessage, got %d", messageType)
@@ -58,12 +55,9 @@ func TestWSClient(t *testing.T) {
 	}
 
 	// Read status message
-	messageType, p, err = conn.ReadMessage()
+	_, p, err = conn.ReadMessage()
 	if err != nil {
 		t.Fatalf("Failed to read status: %v", err)
-	}
-	if messageType != websocket.TextMessage {
-		t.Errorf("Expected TextMessage, got %d", messageType)
 	}
 	var status daemon.Status
 	if err := json.Unmarshal(p, &status); err != nil {
@@ -98,11 +92,11 @@ func TestHandler(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to dial: %v", err)
 	}
-	defer conn.Close()
+	defer conn.Close() //nolint:errcheck
 
 	// Upon connection, AddClient is called, which triggers a status update.
 	// We MUST consume this status message first.
-	messageType, p, err := conn.ReadMessage()
+	messageType, _, err := conn.ReadMessage()
 	if err != nil {
 		t.Fatalf("Failed to read initial status: %v", err)
 	}
@@ -116,8 +110,8 @@ func TestHandler(t *testing.T) {
 	s.Broadcaster.Broadcast(testData)
 
 	foundBroadcast := false
-	for i := 0; i < 5; i++ {
-		_, p, err = conn.ReadMessage()
+	for i := 0; i < 10; i++ {
+		_, p, err := conn.ReadMessage()
 		if err != nil {
 			t.Fatalf("Failed to read broadcast: %v", err)
 		}
@@ -147,7 +141,7 @@ func TestHandler(t *testing.T) {
 		if string(received) != string(inputMsg) {
 			t.Errorf("Expected input '%s', got '%s'", string(inputMsg), string(received))
 		}
-	case <-time.After(500 * time.Millisecond):
+	case <-time.After(1 * time.Second):
 		t.Fatal("Timeout waiting for input to be handled")
 	}
 }

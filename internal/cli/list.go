@@ -23,14 +23,15 @@ var listCmd = &cobra.Command{
 			return
 		}
 
-		resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/sessions", cfg.Port))
+		url := fmt.Sprintf("http://127.0.0.1:%d/sessions", cfg.Port)
+		resp, err := http.Get(url) //nolint:gosec
 		if err != nil {
 			fmt.Println("Error connecting to daemon. Is it running?")
 			return
 		}
-		defer resp.Body.Close()
+		defer resp.Body.Close() //nolint:errcheck
 
-		var sessions []*daemon.Session
+		var sessions []daemon.Session
 		if err := json.NewDecoder(resp.Body).Decode(&sessions); err != nil {
 			fmt.Printf("Error decoding response: %v\n", err)
 			return
@@ -42,15 +43,15 @@ var listCmd = &cobra.Command{
 		}
 
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
-		fmt.Fprintln(w, "ID\tCOMMAND\tSTATUS\tSTARTED")
+		_, _ = fmt.Fprintln(w, "ID\tCOMMAND\tSTATUS\tSTARTED") //nolint:errcheck
 		for _, s := range sessions {
 			status := "stopped"
 			if s.Running {
 				status = "running"
 			}
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", s.ID, s.Command, status, s.StartTime.Format(time.RFC822))
+			_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", s.ID, s.Command, status, s.StartTime.Format(time.RFC822)) //nolint:errcheck
 		}
-		w.Flush()
+		_ = w.Flush() //nolint:errcheck
 	},
 }
 

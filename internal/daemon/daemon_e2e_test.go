@@ -19,7 +19,7 @@ func TestSessionAsyncExecution(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer os.RemoveAll(tempDir) //nolint:errcheck
 
 	config.SetConfigDirOverride(tempDir)
 	defer config.SetConfigDirOverride("") // Reset after test
@@ -89,7 +89,7 @@ func TestMetadataPersistence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer os.RemoveAll(tempDir) //nolint:errcheck
 
 	config.SetConfigDirOverride(tempDir)
 	defer config.SetConfigDirOverride("") // Reset after test

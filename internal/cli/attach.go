@@ -32,7 +32,7 @@ var attachCmd = &cobra.Command{
 			fmt.Printf("Error connecting to daemon: %v\n", err)
 			return
 		}
-		defer c.Close()
+		defer c.Close() //nolint:errcheck
 
 		// Set terminal to raw mode
 		oldState, err := term.MakeRaw(int(os.Stdin.Fd()))

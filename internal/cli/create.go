@@ -33,12 +33,12 @@ var createCmd = &cobra.Command{
 		})
 
 		url := fmt.Sprintf("http://127.0.0.1:%d/sessions", cfg.Port)
-		resp, err := http.Post(url, "application/json", bytes.NewBuffer(reqBody))
+		resp, err := http.Post(url, "application/json", bytes.NewBuffer(reqBody)) //nolint:gosec
 		if err != nil {
 			fmt.Println("Error connecting to daemon. Is it running?")
 			return
 		}
-		defer resp.Body.Close()
+		defer resp.Body.Close() //nolint:errcheck
 
 		if resp.StatusCode == http.StatusCreated {
 			var s daemon.Session

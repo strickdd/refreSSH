@@ -74,7 +74,9 @@ func TestSessionEndpoints(t *testing.T) {
 	w = httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 
-	json.NewDecoder(w.Body).Decode(&sessions)
+	if err := json.NewDecoder(w.Body).Decode(&sessions); err != nil {
+		t.Fatalf("Failed to decode sessions: %v", err)
+	}
 	for _, s := range sessions {
 		if s.ID == "test-api-session" {
 			t.Error("Session still exists after DELETE")

@@ -21,7 +21,7 @@ var stopCmd = &cobra.Command{
 		}
 
 		url := fmt.Sprintf("http://127.0.0.1:%d/sessions/%s", cfg.Port, sessionID)
-		req, err := http.NewRequest(http.MethodDelete, url, nil)
+		req, err := http.NewRequest(http.MethodDelete, url, nil) //nolint:gosec
 		if err != nil {
 			fmt.Printf("Error creating request: %v\n", err)
 			return
@@ -32,7 +32,7 @@ var stopCmd = &cobra.Command{
 			fmt.Println("Error connecting to daemon. Is it running?")
 			return
 		}
-		defer resp.Body.Close()
+		defer resp.Body.Close() //nolint:errcheck
 
 		if resp.StatusCode == http.StatusNoContent {
 			fmt.Printf("Session '%s' stopped.\n", sessionID)

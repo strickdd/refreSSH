@@ -1,10 +1,12 @@
+// Package tui implements the terminal user interface for refreSSH.
 package tui
 
 import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-type model struct {
+// Model represents the state of the TUI application.
+type Model struct {
 	dispatcher     *Dispatcher
 	tabs           []string
 	activeTabIndex int
@@ -14,8 +16,8 @@ type model struct {
 }
 
 // InitialModel initializes the TUI model.
-func InitialModel() model {
-	return model{
+func InitialModel() Model {
+	return Model{
 		dispatcher:     NewDispatcher("ctrl+a"),
 		tabs:           []string{"Session 1"},
 		activeTabIndex: 0,
@@ -23,11 +25,13 @@ func InitialModel() model {
 	}
 }
 
-func (m model) Init() tea.Cmd {
+// Init initializes the TUI.
+func (m Model) Init() tea.Cmd {
 	return nil
 }
 
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+// Update handles TUI messages and updates the model.
+func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		action, consumed := m.dispatcher.Handle(msg)
@@ -48,7 +52,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m model) handleAction(action Action) (tea.Model, tea.Cmd) {
+func (m Model) handleAction(action Action) (tea.Model, tea.Cmd) {
 	switch action {
 	case ActionQuit:
 		return m, tea.Quit
@@ -69,8 +73,6 @@ func (m model) handleAction(action Action) (tea.Model, tea.Cmd) {
 			if m.activeTabIndex >= len(m.tabs) {
 				m.activeTabIndex = len(m.tabs) - 1
 			}
-		} else if len(m.tabs) == 1 {
-			// Maybe quit if last tab closed? For now just keep it.
 		}
 	case ActionSendPrefix:
 		// In a real app, this would send the prefix to the PTY

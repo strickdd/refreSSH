@@ -182,7 +182,7 @@ func (d *Daemon) loadState() error {
 	}
 
 	statePath := filepath.Join(configDir, "sessions.json")
-	data, err := os.ReadFile(statePath)
+	data, err := os.ReadFile(filepath.Clean(statePath))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
