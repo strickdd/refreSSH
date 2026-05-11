@@ -16,7 +16,7 @@ A cross-platform (Linux, Windows, macOS) persistent terminal session manager, op
 - **Cross-Platform:** Full support for Windows, Linux, and macOS.
 - **TUI Management:** Manage sessions via a rich Terminal User Interface.
 - **AI Agent Optimized:** Specifically designed to host long-running AI CLI agents that require stable environments.
-- **Web UI (Planned):** A local-only web interface with terminal emulation (xterm.js) is planned for future release.
+- **Web UI:** A local-only web interface with terminal emulation (xterm.js), accessible via `refressh ui`.
 
 ## Prerequisites
 
