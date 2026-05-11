@@ -1,0 +1,41 @@
+{
+  "RT_MANIFEST": {
+    "#1": {
+      "0409": {
+        "identity": {
+          "name": "refreSSH",
+          "version": "0.0.0.0"
+        },
+        "description": "refreSSH - Persistent terminal session manager",
+        "minimum-os": "win7",
+        "execution-level": "as invoker",
+        "ui-access": false,
+        "auto-elevate": false,
+        "dpi-awareness": "system",
+        "long-path-aware": true,
+        "use-common-controls-v6": true
+      }
+    }
+  },
+  "RT_VERSION": {
+    "#1": {
+      "0000": {
+        "fixed": {
+          "file_version": "0.0.0.0",
+          "product_version": "0.0.0.0"
+        },
+        "info": {
+          "0409": {
+            "CompanyName": "refreSSH",
+            "FileDescription": "refreSSH - Persistent terminal session manager",
+            "FileVersion": "0.0.0.0",
+            "InternalName": "refressh",
+            "LegalCopyright": "MIT License",
+            "ProductName": "refreSSH",
+            "ProductVersion": "0.0.0.0"
+          }
+        }
+      }
+    }
+  }
+}
