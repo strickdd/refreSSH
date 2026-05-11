@@ -1,3 +1,4 @@
+// Package main generates the application icons.
 package main
 
 import (
@@ -43,13 +44,13 @@ func main() {
 
 	// Save Icon
 	f, _ := os.Create("winres/icon.png")
-	defer f.Close()
-	png.Encode(f, img)
+	defer f.Close() //nolint:errcheck
+	_ = png.Encode(f, img) //nolint:errcheck
 
 	// Create 16x16 version
 	img16 := image.NewRGBA(image.Rect(0, 0, 16, 16))
 	xdraw.NearestNeighbor.Scale(img16, img16.Bounds(), textImg, textImg.Bounds(), draw.Over, nil)
 	f16, _ := os.Create("winres/icon16.png")
-	defer f16.Close()
-	png.Encode(f16, img16)
+	defer f16.Close() //nolint:errcheck
+	_ = png.Encode(f16, img16) //nolint:errcheck
 }

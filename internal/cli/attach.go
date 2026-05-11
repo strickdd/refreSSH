@@ -27,10 +27,10 @@ type ringBuffer struct {
 	max int
 }
 
-func newRingBuffer(max int) *ringBuffer {
+func newRingBuffer(maxSize int) *ringBuffer {
 	return &ringBuffer{
-		buf: make([]byte, 0, max),
-		max: max,
+		buf: make([]byte, 0, maxSize),
+		max: maxSize,
 	}
 }
 
@@ -165,7 +165,7 @@ var attachCmd = &cobra.Command{
 									// Strip basic ANSI escapes (optional, but raw might be messy in simple pagers)
 									// For now, write raw so 'less -R' works
 									_, _ = io.Copy(tmpFile, bytes.NewReader(localScrollback.Bytes()))
-									tmpFile.Close()
+									_ = tmpFile.Close() //nolint:errcheck
 
 									pager := "less"
 									args := []string{"-R", tmpFile.Name()}
@@ -178,6 +178,7 @@ var attachCmd = &cobra.Command{
 										args = []string{tmpFile.Name()}
 									}
 
+									//nolint:gosec // user controlled pager is intentional
 									cmd := exec.Command(pager, args...)
 									cmd.Stdin = os.Stdin
 									cmd.Stdout = os.Stdout

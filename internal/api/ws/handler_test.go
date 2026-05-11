@@ -95,13 +95,20 @@ func TestHandler(t *testing.T) {
 	defer conn.Close() //nolint:errcheck
 
 	// Upon connection, AddClient is called, which triggers a status update.
-	// We MUST consume this status message first.
-	messageType, _, err := conn.ReadMessage()
-	if err != nil {
-		t.Fatalf("Failed to read initial status: %v", err)
+	// We MUST consume this status message first, but we might receive scrollback first.
+	foundStatus := false
+	for i := 0; i < 10; i++ {
+		messageType, _, err := conn.ReadMessage()
+		if err != nil {
+			t.Fatalf("Failed to read message: %v", err)
+		}
+		if messageType == websocket.TextMessage {
+			foundStatus = true
+			break
+		}
 	}
-	if messageType != websocket.TextMessage {
-		t.Errorf("Expected TextMessage for status, got %d", messageType)
+	if !foundStatus {
+		t.Fatalf("Expected TextMessage for status, but none received")
 	}
 
 	// Broadcast something and see if it arrives at the WebSocket
