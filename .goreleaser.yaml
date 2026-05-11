@@ -4,8 +4,6 @@ project_name: refreSSH
 
 before:
   hooks:
-    - go mod tidy
-    - go run scripts/gen_icon.go
     - go-winres make --in winres/winres.json --out cmd/refressh/winres --product-version git-tag --file-version git-tag
 
 builds:

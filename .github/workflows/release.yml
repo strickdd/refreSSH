@@ -24,6 +24,8 @@ jobs:
         run: |
           go mod tidy
           go install github.com/tc-hib/go-winres@latest
+      - name: Generate Icon
+        run: go run scripts/gen_icon.go
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
