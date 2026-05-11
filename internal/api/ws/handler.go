@@ -1,11 +1,12 @@
 // Package ws provides WebSocket-based terminal attachment handlers.
 package ws
-
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/strickdd/refressh/internal/daemon"
@@ -25,6 +26,11 @@ var upgrader = websocket.Upgrader{
 		return u.Hostname() == "localhost" || u.Hostname() == "127.0.0.1"
 	},
 }
+
+const (
+	// writeWait is the maximum time to wait for a message to be written.
+	writeWait = 10 * time.Second
+)
 
 // Client wraps a WebSocket connection to satisfy the daemon.Client interface.
 type Client struct {
@@ -50,6 +56,7 @@ func (c *Client) ID() string {
 func (c *Client) Write(p []byte) (n int, err error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	_ = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 	err = c.conn.WriteMessage(websocket.BinaryMessage, p)
 	if err != nil {
 		return 0, err
@@ -65,6 +72,7 @@ func (c *Client) SendStatus(status daemon.Status) error {
 	if err != nil {
 		return err
 	}
+	_ = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 	return c.conn.WriteMessage(websocket.TextMessage, data)
 }
 
@@ -85,6 +93,7 @@ func Handler(d *daemon.Daemon) http.HandlerFunc {
 
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
+			fmt.Printf("Upgrade failed for session %s: %v\n", sessionID, err)
 			return
 		}
 		defer conn.Close() //nolint:errcheck
@@ -93,8 +102,13 @@ func Handler(d *daemon.Daemon) http.HandlerFunc {
 		clientID := r.RemoteAddr
 		client := NewWSClient(clientID, conn)
 
+		fmt.Printf("Client %s connected to session %s\n", clientID, sessionID)
+
 		s.Broadcaster.AddClient(client)
-		defer s.Broadcaster.RemoveClient(clientID)
+		defer func() {
+			fmt.Printf("Client %s disconnected from session %s\n", clientID, sessionID)
+			s.Broadcaster.RemoveClient(clientID)
+		}()
 
 		// Input loop: forward messages from WebSocket to Broadcaster
 		for {
@@ -109,6 +123,7 @@ func Handler(d *daemon.Daemon) http.HandlerFunc {
 				}
 				var ctrl ControlMessage
 				if err := json.Unmarshal(message, &ctrl); err == nil {
+					fmt.Printf("Client %s sent control action: %s\n", clientID, ctrl.Action)
 					if ctrl.Action == "request_primary" {
 						s.Broadcaster.SetPrimary(clientID)
 					}
@@ -117,7 +132,7 @@ func Handler(d *daemon.Daemon) http.HandlerFunc {
 			}
 
 			if _, err := s.Broadcaster.HandleInput(clientID, message); err != nil {
-				// Failed to handle input, possibly due to writer issues
+				fmt.Printf("Failed to handle input from client %s: %v\n", clientID, err)
 				break
 			}
 		}

@@ -86,6 +86,7 @@ func (d *Daemon) CreateSession(id string, command string, args ...string) (*Sess
 	}
 	d.mu.Unlock()
 
+	fmt.Printf("Creating session %s: %s %v\n", id, command, args)
 	s := NewSession(id, command, args...)
 	if err := s.Start(); err != nil {
 		return nil, err
@@ -120,6 +121,7 @@ func (d *Daemon) StopSession(id string) error {
 	delete(d.sessions, id)
 	d.mu.Unlock()
 
+	fmt.Printf("Stopping session %s\n", id)
 	// Persist state
 	if err := d.saveState(); err != nil {
 		fmt.Printf("Warning: failed to save session state: %v\n", err)

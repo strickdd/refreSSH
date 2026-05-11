@@ -146,79 +146,76 @@ var attachCmd = &cobra.Command{
 				if err != nil {
 					return
 				}
-				if n > 0 {
+				
+				for i := 0; i < n; i++ {
+					char := buf[i]
+
 					// Handle Command Mode State Machine
 					if inCommandMode {
 						inCommandMode = false
-						if n == 1 {
-							switch buf[0] {
-							case 'd', 'D': // Detach
-								_, _ = os.Stdout.Write([]byte("\r\n[Detached from session]\r\n")) //nolint:errcheck
-								close(done)
-								return
-							case 's', 'S': // Scrollback Search via Pager
-								restoreRaw()
-								
-								// Create temp file
-								tmpFile, err := os.CreateTemp("", "refressh-scrollback-*.txt")
-								if err == nil {
-									// Strip basic ANSI escapes (optional, but raw might be messy in simple pagers)
-									// For now, write raw so 'less -R' works
-									_, _ = io.Copy(tmpFile, bytes.NewReader(localScrollback.Bytes()))
-									_ = tmpFile.Close() //nolint:errcheck
+						switch char {
+						case 'd', 'D': // Detach
+							_, _ = os.Stdout.Write([]byte("\r\n[Detached from session]\r\n")) //nolint:errcheck
+							close(done)
+							return
+						case 's', 'S': // Scrollback Search via Pager
+							restoreRaw()
+							
+							// Create temp file
+							tmpFile, err := os.CreateTemp("", "refressh-scrollback-*.txt")
+							if err == nil {
+								// Strip basic ANSI escapes (optional, but raw might be messy in simple pagers)
+								// For now, write raw so 'less -R' works
+								_, _ = io.Copy(tmpFile, bytes.NewReader(localScrollback.Bytes()))
+								_ = tmpFile.Close() //nolint:errcheck
 
-									pager := "less"
-									args := []string{"-R", tmpFile.Name()}
-									if runtime.GOOS == "windows" {
-										pager = "more"
-										args = []string{tmpFile.Name()}
-									}
-									if p := os.Getenv("PAGER"); p != "" {
-										pager = p
-										args = []string{tmpFile.Name()}
-									}
+								pager := "less"
+								args := []string{"-R", tmpFile.Name()}
+								if runtime.GOOS == "windows" {
+									pager = "more"
+									args = []string{tmpFile.Name()}
+								}
+								if p := os.Getenv("PAGER"); p != "" {
+									pager = p
+									args = []string{tmpFile.Name()}
+								}
 
-									//nolint:gosec // user controlled pager is intentional
-									cmd := exec.Command(pager, args...)
-									cmd.Stdin = os.Stdin
-									cmd.Stdout = os.Stdout
-									cmd.Stderr = os.Stderr
-									_ = cmd.Run() // Wait for pager to finish
-									
-									_ = os.Remove(tmpFile.Name())
-								}
+								//nolint:gosec // user controlled pager is intentional
+								cmd := exec.Command(pager, args...)
+								cmd.Stdin = os.Stdin
+								cmd.Stdout = os.Stdout
+								cmd.Stderr = os.Stderr
+								_ = cmd.Run() // Wait for pager to finish
 								
-								_, _ = term.MakeRaw(fd) // Re-enter raw mode
-								continue
-							case 0x02: // Ctrl+B again sends a literal Ctrl+B
-								err = c.WriteMessage(websocket.BinaryMessage, []byte{0x02})
-								if err != nil {
-									return
-								}
-							default:
-								// Exit command mode, do nothing
-								_, _ = os.Stdout.Write([]byte("\r\n[Command mode exited]\r\n")) //nolint:errcheck
+								_ = os.Remove(tmpFile.Name())
 							}
+							
+							_, _ = term.MakeRaw(fd) // Re-enter raw mode
+						case 0x02: // Ctrl+B again sends a literal Ctrl+B
+							_ = c.WriteMessage(websocket.BinaryMessage, []byte{0x02}) //nolint:errcheck
+						default:
+							// Exit command mode, do nothing
+							_, _ = os.Stdout.Write([]byte("\r\n[Command mode exited]\r\n")) //nolint:errcheck
 						}
 						continue
 					}
 
 					// Terminal Mode
-					if n == 1 {
-						if buf[0] == 0x02 { // Ctrl+B
-							inCommandMode = true
-							_, _ = os.Stdout.Write([]byte("\r\n[Command Mode: 'd' to detach, 's' to search scrollback, 'Ctrl+B' to send literal]\r\n")) //nolint:errcheck
-							continue
-						}
-						if buf[0] == 0x00 { // Ctrl+Space
-							req := map[string]string{"action": "request_primary"}
-							reqBytes, _ := json.Marshal(req)
-							_ = c.WriteMessage(websocket.TextMessage, reqBytes) //nolint:errcheck
-							continue
-						}
+					if char == 0x02 { // Ctrl+B
+						inCommandMode = true
+						_, _ = os.Stdout.Write([]byte("\r\n[Command Mode: 'd' to detach, 's' to search scrollback, 'Ctrl+B' to send literal]\r\n")) //nolint:errcheck
+						continue
+					}
+					
+					if char == 0x00 { // Ctrl+Space
+						req := map[string]string{"action": "request_primary"}
+						reqBytes, _ := json.Marshal(req)
+						_ = c.WriteMessage(websocket.TextMessage, reqBytes) //nolint:errcheck
+						continue
 					}
 
-					err = c.WriteMessage(websocket.BinaryMessage, buf[:n])
+					// Send character to PTY
+					err = c.WriteMessage(websocket.BinaryMessage, []byte{char})
 					if err != nil {
 						return
 					}

@@ -2,6 +2,7 @@
 package daemon
 
 import (
+	"fmt"
 	"io"
 	"sync"
 )
@@ -128,6 +129,7 @@ func (b *Broadcaster) RemoveClient(id string) {
 func (b *Broadcaster) SetPrimary(id string) {
 	b.mu.Lock()
 	if _, ok := b.clients[id]; ok {
+		fmt.Printf("Promoting client %s to primary\n", id)
 		b.primaryClientID = id
 	}
 	b.mu.Unlock()
