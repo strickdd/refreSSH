@@ -24,15 +24,11 @@ func main() {
 	// Primary color: Bright Terminal Green (#43ED0F)
 	green := color.RGBA{0x43, 0xED, 0x0F, 255}
 
-	// Draw text "R:\>SSH.exe"
-	// We'll use a large scale for the basic font or draw it manually for impact
-	s := "R:\\>SSH.exe"
+	// Draw text "R>_"
+	s := "R>_"
 	
-	// Create a temporary high-res canvas for the font
-	// basicfont.Face7x13 is small, so we'll draw it to a smaller buffer and scale up
-	// to get that pixelated retro look.
-	
-	textImg := image.NewRGBA(image.Rect(0, 0, 80, 15))
+	// Create a temporary canvas for the font
+	textImg := image.NewRGBA(image.Rect(0, 0, 30, 15))
 	d := &font.Drawer{
 		Dst:  textImg,
 		Src:  image.NewUniform(green),
