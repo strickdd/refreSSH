@@ -82,6 +82,31 @@
             justify-content: space-between;
             align-items: center;
         }
+        #search-container {
+            display: none; /* Only show when a session is active */
+            align-items: center;
+            gap: 5px;
+            margin-right: auto;
+            margin-left: 20px;
+        }
+        #search-input {
+            background-color: #121212;
+            border: 1px solid #333;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+        .search-btn {
+            background: #333;
+            border: 1px solid #555;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .search-btn:hover {
+            background: #444;
+        }
         #terminal-container {
             flex-grow: 1;
             padding: 10px;
@@ -201,6 +226,11 @@
     <div id="main-content">
         <div id="terminal-header">
             <h3 id="current-session-title" style="margin: 0; font-weight: normal;">No Session Selected</h3>
+            <div id="search-container">
+                <input type="text" id="search-input" placeholder="Find in scrollback..." />
+                <button id="btn-search-prev" class="search-btn">▲ Prev</button>
+                <button id="btn-search-next" class="search-btn">▼ Next</button>
+            </div>
             <div style="display: flex; align-items: center;">
                 <span id="badge-primary" class="primary-badge">PRIMARY</span>
                 <span id="badge-view" class="view-only-badge">VIEW ONLY</span>
@@ -217,6 +247,7 @@
 
     <script src="xterm.js"></script>
     <script src="xterm-addon-fit.js"></script>
+    <script src="xterm-addon-search.js"></script>
     <script>
         let token = new URLSearchParams(window.location.search).get('token') || sessionStorage.getItem('refressh_token');
         let currentSessionId = null;
@@ -231,9 +262,46 @@
             }
         });
         const fitAddon = new FitAddon.FitAddon();
+        const searchAddon = new SearchAddon.SearchAddon();
         term.loadAddon(fitAddon);
+        term.loadAddon(searchAddon);
         term.open(document.getElementById('terminal-container'));
         fitAddon.fit();
+
+        // Search Handlers
+        const searchInput = document.getElementById('search-input');
+        const btnSearchNext = document.getElementById('btn-search-next');
+        const btnSearchPrev = document.getElementById('btn-search-prev');
+
+        function performSearch(next) {
+            const query = searchInput.value;
+            if (!query) return;
+            if (next) {
+                searchAddon.findNext(query);
+            } else {
+                searchAddon.findPrevious(query);
+            }
+        }
+
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                performSearch(!e.shiftKey);
+            } else if (e.key === 'Escape') {
+                searchAddon.clearDecorations();
+                searchInput.value = '';
+                term.focus();
+            }
+        });
+        btnSearchNext.addEventListener('click', () => performSearch(true));
+        btnSearchPrev.addEventListener('click', () => performSearch(false));
+
+        window.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'f') {
+                e.preventDefault();
+                searchInput.focus();
+                searchInput.select();
+            }
+        });
 
         window.addEventListener('resize', () => {
             fitAddon.fit();
@@ -316,15 +384,18 @@
         function setStatus(connected) {
             const ind = document.getElementById('conn-indicator');
             const txt = document.getElementById('conn-text');
+            const searchContainer = document.getElementById('search-container');
             if (connected) {
                 ind.className = 'status-indicator status-connected';
                 txt.innerText = 'Connected';
+                searchContainer.style.display = 'flex';
             } else {
                 ind.className = 'status-indicator status-disconnected';
                 txt.innerText = 'Disconnected';
                 document.getElementById('badge-primary').style.display = 'none';
                 document.getElementById('badge-view').style.display = 'none';
                 document.getElementById('btn-request-control').style.display = 'none';
+                searchContainer.style.display = 'none';
                 isPrimary = false;
             }
         }
