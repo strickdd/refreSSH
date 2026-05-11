@@ -30,7 +30,7 @@ func ensureDaemonRunning() error {
 		return fmt.Errorf("failed to get executable path: %w", err)
 	}
 
-	cmd := exec.Command(executable, "daemon", "start")
+	cmd := exec.Command(executable, "daemon", "start") //nolint:gosec
 
 	// Detach the process from the current terminal
 	if err := startDetached(cmd); err != nil {
