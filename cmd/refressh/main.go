@@ -1,6 +1,8 @@
 // Package main is the entry point for the refreSSH CLI application.
 package main
 
+//go:generate go-winres make --in ../../winres/winres.json --out winres --product-version git-tag --file-version git-tag
+
 import (
 	"fmt"
 	"os"
