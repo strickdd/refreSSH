@@ -98,10 +98,24 @@ func Handler(d *daemon.Daemon) http.HandlerFunc {
 
 		// Input loop: forward messages from WebSocket to Broadcaster
 		for {
-			_, message, err := conn.ReadMessage()
+			msgType, message, err := conn.ReadMessage()
 			if err != nil {
 				break
 			}
+
+			if msgType == websocket.TextMessage {
+				type ControlMessage struct {
+					Action string `json:"action"`
+				}
+				var ctrl ControlMessage
+				if err := json.Unmarshal(message, &ctrl); err == nil {
+					if ctrl.Action == "request_primary" {
+						s.Broadcaster.SetPrimary(clientID)
+					}
+				}
+				continue
+			}
+
 			if _, err := s.Broadcaster.HandleInput(clientID, message); err != nil {
 				// Failed to handle input, possibly due to writer issues
 				break

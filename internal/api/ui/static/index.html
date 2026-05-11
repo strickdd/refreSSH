@@ -95,6 +95,7 @@
             color: #aaa;
             display: flex;
             justify-content: space-between;
+            align-items: center;
         }
         .status-indicator {
             display: inline-block;
@@ -105,6 +106,38 @@
         }
         .status-connected { background-color: #43ED0F; }
         .status-disconnected { background-color: #ff5f57; }
+        .primary-badge {
+            background-color: #43ED0F;
+            color: black;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-left: 10px;
+            display: none;
+        }
+        .view-only-badge {
+            background-color: #ffbd2e;
+            color: black;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-left: 10px;
+            display: none;
+        }
+        #btn-request-control {
+            background: none;
+            border: 1px solid #ffbd2e;
+            color: #ffbd2e;
+            padding: 2px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 10px;
+            display: none;
+        }
+        #btn-request-control:hover {
+            background-color: #ffbd2e;
+            color: black;
+        }
         #auth-overlay {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
@@ -168,8 +201,11 @@
     <div id="main-content">
         <div id="terminal-header">
             <h3 id="current-session-title" style="margin: 0; font-weight: normal;">No Session Selected</h3>
-            <div>
-                <button id="btn-refresh" style="background: none; border: 1px solid #333; color: white; padding: 5px 10px; border-radius: 4px; cursor: pointer;">Refresh List</button>
+            <div style="display: flex; align-items: center;">
+                <span id="badge-primary" class="primary-badge">PRIMARY</span>
+                <span id="badge-view" class="view-only-badge">VIEW ONLY</span>
+                <button id="btn-request-control">Request Control</button>
+                <button id="btn-refresh" style="background: none; border: 1px solid #333; color: white; padding: 5px 10px; border-radius: 4px; cursor: pointer; margin-left: 10px;">Refresh List</button>
             </div>
         </div>
         <div id="terminal-container"></div>
@@ -185,6 +221,8 @@
         let token = new URLSearchParams(window.location.search).get('token') || sessionStorage.getItem('refressh_token');
         let currentSessionId = null;
         let ws = null;
+        let isPrimary = false;
+
         const term = new Terminal({
             cursorBlink: true,
             theme: {
@@ -221,6 +259,12 @@
             url.searchParams.delete('token');
             window.history.replaceState({}, document.title, url);
             fetchSessions();
+        });
+
+        document.getElementById('btn-request-control').addEventListener('click', () => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ action: "request_primary" }));
+            }
         });
 
         async function fetchSessions() {
@@ -278,6 +322,23 @@
             } else {
                 ind.className = 'status-indicator status-disconnected';
                 txt.innerText = 'Disconnected';
+                document.getElementById('badge-primary').style.display = 'none';
+                document.getElementById('badge-view').style.display = 'none';
+                document.getElementById('btn-request-control').style.display = 'none';
+                isPrimary = false;
+            }
+        }
+
+        function updatePrimaryStatus(primary) {
+            isPrimary = primary;
+            if (primary) {
+                document.getElementById('badge-primary').style.display = 'inline-block';
+                document.getElementById('badge-view').style.display = 'none';
+                document.getElementById('btn-request-control').style.display = 'none';
+            } else {
+                document.getElementById('badge-primary').style.display = 'none';
+                document.getElementById('badge-view').style.display = 'inline-block';
+                document.getElementById('btn-request-control').style.display = 'inline-block';
             }
         }
 
@@ -309,7 +370,9 @@
                     // Control messages
                     try {
                         const msg = JSON.parse(event.data);
-                        console.log("Status update:", msg);
+                        if (msg.is_primary !== undefined) {
+                            updatePrimaryStatus(msg.is_primary);
+                        }
                     } catch(e) {}
                 }
             };
@@ -320,7 +383,7 @@
             };
 
             term.onData(data => {
-                if (ws && ws.readyState === WebSocket.OPEN) {
+                if (ws && ws.readyState === WebSocket.OPEN && isPrimary) {
                     const buffer = new TextEncoder().encode(data);
                     ws.send(buffer);
                 }

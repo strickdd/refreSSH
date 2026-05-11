@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -67,14 +68,28 @@ var attachCmd = &cobra.Command{
 		go func() {
 			defer close(done)
 			for {
-				_, message, err := c.ReadMessage()
+				msgType, message, err := c.ReadMessage()
 				if err != nil {
 					return
 				}
-				// Output is usually binary PTY data
-				_, err = os.Stdout.Write(message)
-				if err != nil {
-					return
+				
+				if msgType == websocket.TextMessage {
+					var status struct {
+						IsPrimary bool `json:"is_primary"`
+					}
+					if err := json.Unmarshal(message, &status); err == nil {
+						// Update terminal window title
+						title := fmt.Sprintf("\033]0;[View Only] refreSSH: %s (Ctrl+Space to request control)\007", sessionID)
+						if status.IsPrimary {
+							title = fmt.Sprintf("\033]0;[Primary] refreSSH: %s\007", sessionID)
+						}
+						_, _ = os.Stdout.Write([]byte(title)) //nolint:errcheck
+					}
+				} else {
+					_, err = os.Stdout.Write(message)
+					if err != nil {
+						return
+					}
 				}
 			}
 		}()
@@ -88,6 +103,14 @@ var attachCmd = &cobra.Command{
 					return
 				}
 				if n > 0 {
+					// Check for Ctrl+Space (0x00) to request primary control
+					if n == 1 && buf[0] == 0x00 {
+						req := map[string]string{"action": "request_primary"}
+						reqBytes, _ := json.Marshal(req)
+						_ = c.WriteMessage(websocket.TextMessage, reqBytes) //nolint:errcheck
+						continue
+					}
+
 					err = c.WriteMessage(websocket.BinaryMessage, buf[:n])
 					if err != nil {
 						return
