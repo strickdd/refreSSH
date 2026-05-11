@@ -17,6 +17,7 @@ A cross-platform (Linux, Windows, macOS) persistent terminal session manager, op
 - **TUI Management:** Manage sessions via a rich Terminal User Interface.
 - **AI Agent Optimized:** Specifically designed to host long-running AI CLI agents that require stable environments.
 - **Web UI:** A local-only web interface with terminal emulation (xterm.js), accessible via `refressh ui`.
+- **Sandbox Deployments:** Spin up completely isolated, containerized daemon environments using Docker.
 
 ## Prerequisites
 
@@ -27,6 +28,7 @@ A cross-platform (Linux, Windows, macOS) persistent terminal session manager, op
 
 ### For Running
 - A terminal emulator with PTY support.
+- **Docker & Docker Compose** (Optional, required only for Sandbox deployments).
 
 ## Installation
 
@@ -40,6 +42,7 @@ go build -o refressh ./cmd/refressh
 
 ## Usage
 
+### Standard Mode
 ```bash
 # Start the daemon
 refressh daemon start
@@ -55,6 +58,21 @@ refressh attach my-session
 
 # Stop a session
 refressh stop my-session
+```
+
+### Sandbox Mode (Isolated Container)
+You can run the refreSSH daemon inside an isolated Docker container for maximum security. The CLI automatically handles building and deploying the container, securely mapping the API back to your local machine.
+
+```bash
+# Start an isolated Sandbox container
+refressh sandbox start
+
+# The sandbox is now running on 127.0.0.1:9000.
+# You can connect to it using the standard UI or CLI commands.
+refressh ui
+
+# Stop the Sandbox container
+refressh sandbox stop
 ```
 
 ## Contributing
