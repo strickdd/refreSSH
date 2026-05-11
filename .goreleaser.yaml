@@ -1,6 +1,6 @@
 # .goreleaser.yaml
 version: 2
-project_name: refressh
+project_name: refreSSH
 
 before:
   hooks:
@@ -24,15 +24,13 @@ builds:
 
 archives:
   - format: tar.gz
-    # this name template makes the OS and Arch compatible with the results of `uname`.
     name_template: >-
       {{ .ProjectName }}_
+      {{- .Version }}_
       {{- title .Os }}_
       {{- if eq .Arch "amd64" }}x86_64
       {{- else if eq .Arch "386" }}i386
       {{- else }}{{ .Arch }}{{ end }}
-      {{- if .Arm }}v{{ .Arm }}{{ end }}
-    # use zip for windows archives
     format_overrides:
       - goos: windows
         format: zip
@@ -41,11 +39,41 @@ checksum:
   name_template: 'checksums.txt'
 
 snapshot:
-  name_template: "{{ incpatch .Version }}-next"
+  version_template: "{{ incpatch .Version }}-next"
 
 changelog:
-  sort: asc
+  sort: desc
   filters:
     exclude:
       - '^docs:'
       - '^test:'
+      - '^chore:'
+      - 'Merge pull request'
+      - 'Merge branch'
+  groups:
+    - title: '🚀 Features'
+      regexp: "^.*feat[(\\w)]*!?:.+$"
+      order: 0
+    - title: '🐛 Bug Fixes'
+      regexp: "^.*fix[(\\w)]*!?:.+$"
+      order: 1
+    - title: '🔒 Security'
+      regexp: "^.*security[(\\w)]*!?:.+$"
+      order: 2
+    - title: '✨ Enhancements'
+      regexp: "^.*perf[(\\w)]*!?:.+$"
+      order: 3
+    - title: '🛠 Refactoring'
+      regexp: "^.*refactor[(\\w)]*!?:.+$"
+      order: 4
+    - title: '📝 Documentation'
+      regexp: "^.*docs[(\\w)]*!?:.+$"
+      order: 5
+    - title: '🔄 CI/CD'
+      regexp: "^.*ci[(\\w)]*!?:.+$"
+      order: 6
+    - title: '🧪 Testing'
+      regexp: "^.*test[(\\w)]*!?:.+$"
+      order: 7
+    - title: '🧹 Others'
+      order: 99
