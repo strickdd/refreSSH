@@ -18,6 +18,11 @@ const (
 	DefaultAutoShutdownMinutes = 0
 )
 
+var (
+	// Version is the current version of refreSSH, set at build time.
+	Version = "dev"
+)
+
 // Config represents the application configuration schema.
 type Config struct {
 	// Port is the local TCP port the API server listens on.
