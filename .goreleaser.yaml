@@ -43,6 +43,14 @@ snapshot:
 
 changelog:
   sort: desc
+  template: |
+    ## Changelog
+    {{- range .Groups }}
+    ### {{ .Title }}
+    {{ range .Commits }}
+    * {{ .Subject }}
+    {{- end }}
+    {{- end }}
   filters:
     exclude:
       - '^docs:'
