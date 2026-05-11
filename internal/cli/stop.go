@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/spf13/cobra"
 	"github.com/strickdd/refressh/internal/config"
@@ -20,12 +21,20 @@ var stopCmd = &cobra.Command{
 			return
 		}
 
-		url := fmt.Sprintf("http://127.0.0.1:%d/sessions/%s", cfg.Port, sessionID)
-		req, err := http.NewRequest(http.MethodDelete, url, nil) //nolint:gosec
+		apiURL := fmt.Sprintf("http://127.0.0.1:%d/sessions/%s", cfg.Port, url.PathEscape(sessionID))
+
+		token, err := config.GetAPIToken()
+		if err != nil {
+			fmt.Printf("Error loading API token: %v\n", err)
+			return
+		}
+
+		req, err := http.NewRequest(http.MethodDelete, apiURL, nil) //nolint:gosec
 		if err != nil {
 			fmt.Printf("Error creating request: %v\n", err)
 			return
 		}
+		req.Header.Set("Authorization", "Bearer "+token)
 
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {

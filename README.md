@@ -13,14 +13,14 @@ A cross-platform (Linux, Windows, macOS) persistent terminal session manager, op
 
 - **Persistence:** Sessions stay alive even after you disconnect from SSH.
 - **Cross-Platform:** Full support for Windows, Linux, and macOS.
-- **Dual Interface:** Manage sessions via CLI/TUI or a local-only Web UI.
+- **TUI Management:** Manage sessions via a rich Terminal User Interface.
 - **AI Agent Optimized:** Specifically designed to host long-running AI CLI agents that require stable environments.
-- **Local-Only Web UI:** Built-in terminal emulation (xterm.js) accessible only from `127.0.0.1` for security.
+- **Web UI (Planned):** A local-only web interface with terminal emulation (xterm.js) is planned for future release.
 
 ## Prerequisites
 
 ### For Development
-- **Go:** 1.22 or higher
+- **Go:** 1.24 or higher
 - **Git**
 - **Beads (`bd`):** Used for issue tracking and project management.
 
@@ -34,22 +34,26 @@ A cross-platform (Linux, Windows, macOS) persistent terminal session manager, op
 git clone https://github.com/strickdd/refreSSH.git
 cd refreSSH
 go mod tidy
-go build -o refressh .
+go build -o refressh ./cmd/refressh
 ```
 
 ## Usage
 
-*Note: CLI documentation will be updated as features are implemented.*
-
 ```bash
-# Start the daemon and open the TUI
-refressh
+# Start the daemon
+refressh daemon start
+
+# Create a new session
+refressh create my-session bash
 
 # List active sessions
 refressh list
 
 # Attach to a specific session
-refressh attach <session-id>
+refressh attach my-session
+
+# Stop a session
+refressh stop my-session
 ```
 
 ## Contributing

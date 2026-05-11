@@ -33,7 +33,22 @@ var createCmd = &cobra.Command{
 		})
 
 		url := fmt.Sprintf("http://127.0.0.1:%d/sessions", cfg.Port)
-		resp, err := http.Post(url, "application/json", bytes.NewBuffer(reqBody)) //nolint:gosec
+
+		token, err := config.GetAPIToken()
+		if err != nil {
+			fmt.Printf("Error loading API token: %v\n", err)
+			return
+		}
+
+		req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(reqBody))
+		if err != nil {
+			fmt.Printf("Error creating request: %v\n", err)
+			return
+		}
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			fmt.Println("Error connecting to daemon. Is it running?")
 			return

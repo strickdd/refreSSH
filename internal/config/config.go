@@ -2,6 +2,8 @@
 package config
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -59,7 +61,7 @@ func SetConfigDirOverride(dir string) {
 	configDirOverride = dir
 }
 
-// GetConfigDir returns the OS-standard configuration directory for refreSSH.
+// GetConfigDir returns the platform-specific directory for refreSSH configuration.
 // Windows: AppData\.refreSSH, Unix: ~/.refreSSH
 func GetConfigDir() (string, error) {
 	if configDirOverride != "" {
@@ -83,6 +85,41 @@ func GetConfigDir() (string, error) {
 	}
 
 	return configDir, nil
+}
+
+// GetAPIToken returns the local API token, generating one if it doesn't exist.
+func GetAPIToken() (string, error) {
+	configDir, err := GetConfigDir()
+	if err != nil {
+		return "", err
+	}
+
+	tokenPath := filepath.Join(configDir, "token")
+
+	// 1. Try to read existing token
+	data, err := os.ReadFile(filepath.Clean(tokenPath))
+	if err == nil {
+		return string(data), nil
+	}
+
+	// 2. Generate new random token
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("failed to generate random token: %w", err)
+	}
+	token := hex.EncodeToString(b)
+
+	// Ensure config directory exists
+	if err := os.MkdirAll(configDir, 0700); err != nil {
+		return "", fmt.Errorf("failed to create config directory: %w", err)
+	}
+
+	// 3. Save token with secure permissions
+	if err := os.WriteFile(tokenPath, []byte(token), 0600); err != nil {
+		return "", fmt.Errorf("failed to save API token: %w", err)
+	}
+
+	return token, nil
 }
 
 // Load retrieves the configuration from the standard OS location.

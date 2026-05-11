@@ -5,13 +5,29 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"runtime"
 	"testing"
 
+	"github.com/strickdd/refressh/internal/config"
 	"github.com/strickdd/refressh/internal/daemon"
 )
 
 func TestSessionEndpoints(t *testing.T) {
+	// Setup isolated config dir
+	tempDir, err := os.MkdirTemp("", "refressh-api-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tempDir) //nolint:errcheck
+	config.SetConfigDirOverride(tempDir)
+	defer config.SetConfigDirOverride("")
+
+	token, err := config.GetAPIToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	d := daemon.New(nil)
 	handler := NewHandler(d)
 
@@ -28,6 +44,7 @@ func TestSessionEndpoints(t *testing.T) {
 	}
 	body, _ := json.Marshal(createReq)
 	req := httptest.NewRequest("POST", "/sessions", bytes.NewBuffer(body))
+	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 
@@ -37,6 +54,7 @@ func TestSessionEndpoints(t *testing.T) {
 
 	// 2. Test GET /sessions
 	req = httptest.NewRequest("GET", "/sessions", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
 	w = httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 
@@ -62,6 +80,7 @@ func TestSessionEndpoints(t *testing.T) {
 
 	// 3. Test DELETE /sessions/{id}
 	req = httptest.NewRequest("DELETE", "/sessions/test-api-session", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
 	w = httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 
@@ -71,6 +90,7 @@ func TestSessionEndpoints(t *testing.T) {
 
 	// Verify it's gone
 	req = httptest.NewRequest("GET", "/sessions", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
 	w = httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
 	"os/signal"
@@ -25,9 +26,20 @@ var attachCmd = &cobra.Command{
 			return
 		}
 
-		u := url.URL{Scheme: "ws", Host: fmt.Sprintf("127.0.0.1:%d", cfg.Port), Path: "/attach", RawQuery: "id=" + sessionID}
+		token, err := config.GetAPIToken()
+		if err != nil {
+			fmt.Printf("Error loading API token: %v\n", err)
+			return
+		}
 
-		c, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
+		params := url.Values{}
+		params.Add("id", sessionID)
+		u := url.URL{Scheme: "ws", Host: fmt.Sprintf("127.0.0.1:%d", cfg.Port), Path: "/attach", RawQuery: params.Encode()}
+
+		header := http.Header{}
+		header.Add("Authorization", "Bearer "+token)
+
+		c, _, err := websocket.DefaultDialer.Dial(u.String(), header)
 		if err != nil {
 			fmt.Printf("Error connecting to daemon: %v\n", err)
 			return

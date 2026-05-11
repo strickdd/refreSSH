@@ -4,6 +4,7 @@ package ws
 import (
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -11,9 +12,17 @@ import (
 )
 
 var upgrader = websocket.Upgrader{
-	CheckOrigin: func(_ *http.Request) bool {
-		// Strictly local-only as per GEMINI.md, but ListenAndServe on 127.0.0.1 handles this.
-		return true
+	CheckOrigin: func(r *http.Request) bool {
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			return true // Not a browser request (likely CLI)
+		}
+		u, err := url.Parse(origin)
+		if err != nil {
+			return false
+		}
+		// Strictly allow only local origins to prevent CSWH
+		return u.Hostname() == "localhost" || u.Hostname() == "127.0.0.1"
 	},
 }
 
