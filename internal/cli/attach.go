@@ -97,18 +97,49 @@ var attachCmd = &cobra.Command{
 		// Goroutine to read from stdin and write to WebSocket
 		go func() {
 			buf := make([]byte, 1024)
+			inCommandMode := false
+
 			for {
 				n, err := os.Stdin.Read(buf)
 				if err != nil {
 					return
 				}
 				if n > 0 {
-					// Check for Ctrl+Space (0x00) to request primary control
-					if n == 1 && buf[0] == 0x00 {
-						req := map[string]string{"action": "request_primary"}
-						reqBytes, _ := json.Marshal(req)
-						_ = c.WriteMessage(websocket.TextMessage, reqBytes) //nolint:errcheck
+					// Handle Command Mode State Machine
+					if inCommandMode {
+						inCommandMode = false
+						if n == 1 {
+							switch buf[0] {
+							case 'd', 'D': // Detach
+								_, _ = os.Stdout.Write([]byte("\r\n[Detached from session]\r\n")) //nolint:errcheck
+								close(done)
+								return
+							case 0x02: // Ctrl+B again sends a literal Ctrl+B
+								err = c.WriteMessage(websocket.BinaryMessage, []byte{0x02})
+								if err != nil {
+									return
+								}
+							default:
+								// Exit command mode, do nothing
+								_, _ = os.Stdout.Write([]byte("\r\n[Command mode exited]\r\n")) //nolint:errcheck
+							}
+						}
 						continue
+					}
+
+					// Terminal Mode
+					if n == 1 {
+						if buf[0] == 0x02 { // Ctrl+B
+							inCommandMode = true
+							_, _ = os.Stdout.Write([]byte("\r\n[Command Mode: 'd' to detach, 'Ctrl+B' to send literal]\r\n")) //nolint:errcheck
+							continue
+						}
+						if buf[0] == 0x00 { // Ctrl+Space
+							req := map[string]string{"action": "request_primary"}
+							reqBytes, _ := json.Marshal(req)
+							_ = c.WriteMessage(websocket.TextMessage, reqBytes) //nolint:errcheck
+							continue
+						}
 					}
 
 					err = c.WriteMessage(websocket.BinaryMessage, buf[:n])
