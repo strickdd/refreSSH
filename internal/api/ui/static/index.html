@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>refreSSH Web UI</title>
+    <link rel="stylesheet" href="xterm.css" />
+    <style>
+        body {
+            background-color: #121212;
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #sidebar {
+            width: 250px;
+            background-color: #1e1e1e;
+            border-right: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+        }
+        #sidebar-header {
+            padding: 20px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-bottom: 1px solid #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        #sidebar-header .icon {
+            color: #43ED0F;
+            font-family: monospace;
+            font-size: 1.5rem;
+        }
+        #session-list {
+            flex-grow: 1;
+            overflow-y: auto;
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .session-item {
+            padding: 15px 20px;
+            cursor: pointer;
+            border-bottom: 1px solid #2a2a2a;
+            transition: background 0.2s;
+        }
+        .session-item:hover {
+            background-color: #2a2a2a;
+        }
+        .session-item.active {
+            background-color: #333;
+            border-left: 3px solid #43ED0F;
+        }
+        .session-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .session-cmd {
+            font-size: 0.8rem;
+            color: #aaa;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        #main-content {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        #terminal-header {
+            padding: 10px 20px;
+            background-color: #1e1e1e;
+            border-bottom: 1px solid #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        #terminal-container {
+            flex-grow: 1;
+            padding: 10px;
+            background-color: #000;
+        }
+        #status-bar {
+            padding: 5px 20px;
+            background-color: #1e1e1e;
+            border-top: 1px solid #333;
+            font-size: 0.8rem;
+            color: #aaa;
+            display: flex;
+            justify-content: space-between;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        .status-connected { background-color: #43ED0F; }
+        .status-disconnected { background-color: #ff5f57; }
+        #auth-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .auth-box {
+            background: #1e1e1e;
+            padding: 30px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            text-align: center;
+        }
+        .auth-box input {
+            padding: 10px;
+            width: 300px;
+            background: #121212;
+            border: 1px solid #333;
+            color: white;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        .auth-box button {
+            padding: 10px 20px;
+            background: #43ED0F;
+            color: black;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="auth-overlay" style="display: none;">
+        <div class="auth-box">
+            <h2>Authentication Required</h2>
+            <p>Please enter your refreSSH API token.</p>
+            <form id="auth-form">
+                <input type="password" id="auth-token" placeholder="Token" required />
+                <br>
+                <button type="submit">Connect</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="sidebar">
+        <div id="sidebar-header">
+            <span class="icon">R>_</span>
+            refreSSH
+        </div>
+        <ul id="session-list">
+            <!-- Sessions will be populated here -->
+        </ul>
+    </div>
+
+    <div id="main-content">
+        <div id="terminal-header">
+            <h3 id="current-session-title" style="margin: 0; font-weight: normal;">No Session Selected</h3>
+            <div>
+                <button id="btn-refresh" style="background: none; border: 1px solid #333; color: white; padding: 5px 10px; border-radius: 4px; cursor: pointer;">Refresh List</button>
+            </div>
+        </div>
+        <div id="terminal-container"></div>
+        <div id="status-bar">
+            <span><span id="conn-indicator" class="status-indicator status-disconnected"></span><span id="conn-text">Disconnected</span></span>
+            <span id="term-size"></span>
+        </div>
+    </div>
+
+    <script src="xterm.js"></script>
+    <script src="xterm-addon-fit.js"></script>
+    <script>
+        let token = new URLSearchParams(window.location.search).get('token') || sessionStorage.getItem('refressh_token');
+        let currentSessionId = null;
+        let ws = null;
+        const term = new Terminal({
+            cursorBlink: true,
+            theme: {
+                background: '#000000',
+                foreground: '#ffffff',
+            }
+        });
+        const fitAddon = new FitAddon.FitAddon();
+        term.loadAddon(fitAddon);
+        term.open(document.getElementById('terminal-container'));
+        fitAddon.fit();
+
+        window.addEventListener('resize', () => {
+            fitAddon.fit();
+            updateTermSize();
+        });
+
+        function updateTermSize() {
+            document.getElementById('term-size').innerText = `${term.cols}x${term.rows}`;
+        }
+        updateTermSize();
+
+        function showAuth() {
+            document.getElementById('auth-overlay').style.display = 'flex';
+        }
+
+        document.getElementById('auth-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            token = document.getElementById('auth-token').value;
+            sessionStorage.setItem('refressh_token', token);
+            document.getElementById('auth-overlay').style.display = 'none';
+            // Update URL to hide token
+            const url = new URL(window.location);
+            url.searchParams.delete('token');
+            window.history.replaceState({}, document.title, url);
+            fetchSessions();
+        });
+
+        async function fetchSessions() {
+            if (!token) {
+                showAuth();
+                return;
+            }
+            try {
+                const res = await fetch('/sessions', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.status === 401) {
+                    sessionStorage.removeItem('refressh_token');
+                    token = null;
+                    showAuth();
+                    return;
+                }
+                const sessions = await res.json();
+                renderSessions(sessions);
+            } catch (err) {
+                console.error("Failed to fetch sessions", err);
+            }
+        }
+
+        function renderSessions(sessions) {
+            const list = document.getElementById('session-list');
+            list.innerHTML = '';
+            for (const id in sessions) {
+                const s = sessions[id];
+                const li = document.createElement('li');
+                li.className = 'session-item';
+                if (id === currentSessionId) li.classList.add('active');
+                
+                const name = document.createElement('div');
+                name.className = 'session-name';
+                name.innerText = id;
+                
+                const cmd = document.createElement('div');
+                cmd.className = 'session-cmd';
+                cmd.innerText = s.command + ' ' + (s.args ? s.args.join(' ') : '');
+                
+                li.appendChild(name);
+                li.appendChild(cmd);
+                li.addEventListener('click', () => connectToSession(id, s));
+                list.appendChild(li);
+            }
+        }
+
+        function setStatus(connected) {
+            const ind = document.getElementById('conn-indicator');
+            const txt = document.getElementById('conn-text');
+            if (connected) {
+                ind.className = 'status-indicator status-connected';
+                txt.innerText = 'Connected';
+            } else {
+                ind.className = 'status-indicator status-disconnected';
+                txt.innerText = 'Disconnected';
+            }
+        }
+
+        function connectToSession(id, sessionData) {
+            if (ws) {
+                ws.close();
+            }
+            currentSessionId = id;
+            document.getElementById('current-session-title').innerText = `Session: ${id}`;
+            term.clear();
+            
+            // Re-render list to show active state
+            fetchSessions();
+
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/attach?id=${encodeURIComponent(id)}&token=${encodeURIComponent(token)}`;
+            
+            ws = new WebSocket(wsUrl);
+            ws.binaryType = 'arraybuffer';
+
+            ws.onopen = () => {
+                setStatus(true);
+            };
+
+            ws.onmessage = (event) => {
+                if (event.data instanceof ArrayBuffer) {
+                    term.write(new Uint8Array(event.data));
+                } else {
+                    // Control messages
+                    try {
+                        const msg = JSON.parse(event.data);
+                        console.log("Status update:", msg);
+                    } catch(e) {}
+                }
+            };
+
+            ws.onclose = () => {
+                setStatus(false);
+                term.write('\r\n\x1b[31m[Disconnected]\x1b[0m\r\n');
+            };
+
+            term.onData(data => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    const buffer = new TextEncoder().encode(data);
+                    ws.send(buffer);
+                }
+            });
+        }
+
+        document.getElementById('btn-refresh').addEventListener('click', fetchSessions);
+
+        // Initial check
+        if (token) {
+            sessionStorage.setItem('refressh_token', token);
+            // Hide token from URL
+            const url = new URL(window.location);
+            if (url.searchParams.has('token')) {
+                url.searchParams.delete('token');
+                window.history.replaceState({}, document.title, url);
+            }
+            fetchSessions();
+        } else {
+            showAuth();
+        }
+
+    </script>
+</body>
+</html>

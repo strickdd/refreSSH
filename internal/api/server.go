@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/strickdd/refressh/internal/api/ui"
 	"github.com/strickdd/refressh/internal/api/ws"
 	"github.com/strickdd/refressh/internal/config"
 	"github.com/strickdd/refressh/internal/daemon"
@@ -40,7 +41,15 @@ func NewHandler(d *daemon.Daemon) http.Handler {
 		_, _ = fmt.Fprintf(w, "OK") //nolint:errcheck
 	})
 
-	// Wrap other routes with auth middleware
+	// Web UI Assets (unauthenticated, auth is handled by the UI itself requesting the API)
+	uiAssets, err := ui.Assets()
+	if err == nil {
+		mux.Handle("/", http.FileServer(uiAssets))
+	} else {
+		fmt.Printf("Warning: Could not load UI assets: %v\n", err)
+	}
+
+	// Wrap API routes with auth middleware
 	api := http.NewServeMux()
 
 	// Session list endpoint
@@ -101,7 +110,11 @@ func NewHandler(d *daemon.Daemon) http.Handler {
 	// WebSocket attachment endpoint
 	api.HandleFunc("/attach", ws.Handler(d))
 
-	mux.Handle("/", authMiddleware(api))
+	// Mount authenticated API routes directly to the main mux
+	mux.Handle("GET /sessions", authMiddleware(api))
+	mux.Handle("POST /sessions", authMiddleware(api))
+	mux.Handle("DELETE /sessions/{id}", authMiddleware(api))
+	mux.Handle("/attach", authMiddleware(api))
 
 	return mux
 }
