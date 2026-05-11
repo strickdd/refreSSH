@@ -44,7 +44,8 @@ var listCmd = &cobra.Command{
 
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
 		_, _ = fmt.Fprintln(w, "ID\tCOMMAND\tSTATUS\tSTARTED") //nolint:errcheck
-		for _, s := range sessions {
+		for i := range sessions {
+			s := &sessions[i]
 			status := "stopped"
 			if s.Running {
 				status = "running"

@@ -144,5 +144,5 @@ func (m *mockWSClient) Write(p []byte) (int, error) {
 	m.output <- p
 	return len(p), nil
 }
-func (m *mockWSClient) SendStatus(s Status) error { return nil }
+func (m *mockWSClient) SendStatus(_ Status) error { return nil }
 

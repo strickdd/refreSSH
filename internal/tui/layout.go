@@ -29,6 +29,7 @@ var (
 			BorderForeground(lipgloss.Color("62"))
 )
 
+// View renders the TUI to a string for display.
 func (m Model) View() string {
 	if m.width == 0 || m.height == 0 {
 		return "Initializing..."
