@@ -43,7 +43,9 @@ snapshot:
 
 changelog:
   sort: desc
-  format: "{{ .Message }}"
+  use: git
+  abbrev: -1
+  format: "{{ .Subject }}"
   filters:
     exclude:
       - '^docs:'
