@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/strickdd/refressh/internal/api/ui"
@@ -14,12 +15,16 @@ import (
 )
 
 // Start initializes and starts the local HTTP API server on the specified port.
-// It binds strictly to 127.0.0.1 to ensure local-only access.
+// It binds strictly to 127.0.0.1 by default to ensure local-only access, but can
+// be overridden via the REFRESSH_API_LISTEN environment variable for containerized deployments.
 func Start(port int, d *daemon.Daemon) error {
 	addr := fmt.Sprintf("127.0.0.1:%d", port)
+	if override := os.Getenv("REFRESSH_API_LISTEN"); override != "" {
+		addr = override
+	}
 	fmt.Printf("API Server starting on %s...\n", addr)
 
-	// Bind to local loopback ONLY as per GEMINI.md
+	// Bind to local loopback ONLY as per GEMINI.md, unless overridden for Sandbox Mode
 	server := &http.Server{
 		Addr:              addr,
 		Handler:           NewHandler(d),
