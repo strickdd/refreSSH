@@ -3,8 +3,8 @@
 A cross-platform (Linux, Windows, macOS) persistent terminal session manager, optimized for long-running AI CLI agents.
 
 [![CI](https://github.com/strickdd/refreSSH/actions/workflows/ci.yml/badge.svg)](https://github.com/strickdd/refreSSH/actions/workflows/ci.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/strickdd/refressh)](https://goreportcard.com/report/github.com/strickdd/refressh)
-[![License](https://img.shields.io/github/license/strickdd/refreSSH)](LICENSE)
+[![Go Report Card](https://goreportcard.com/badge/github.com/strickdd/refreSSH)](https://goreportcard.com/report/github.com/strickdd/refreSSH)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 ## Overview
 
