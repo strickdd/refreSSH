@@ -13,8 +13,8 @@ var tuiCmd = &cobra.Command{
 	Short: "Launch the TUI interface",
 	Run: func(_ *cobra.Command, _ []string) {
 		m := tui.InitialModel()
-		if m.err != nil {
-			fmt.Printf("Error: %v\n", m.err)
+		if m.Err() != nil {
+			fmt.Printf("Error: %v\n", m.Err())
 			return
 		}
 

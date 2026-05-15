@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/ansi"
+	"github.com/charmbracelet/x/ansi"
 )
 
 var (

@@ -311,7 +311,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.pagerBuffer = nil
 				m.pagerMsg = ""
 			case " ":
-				m.viewport.ScrollDown()
+				m.viewport.ViewDown()
 			case "home":
 				m.viewport.GotoTop()
 			case "end":
@@ -595,4 +595,9 @@ func splitLines(s string) []string {
 type WSError struct {
 	Tab *Tab
 	Err error
+}
+
+// Err returns the initialization error if the model failed to load.
+func (m Model) Err() error {
+	return m.err
 }
