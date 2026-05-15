@@ -7,11 +7,11 @@ import (
 )
 
 func TestDispatcher(t *testing.T) {
-	prefix := "ctrl+a"
+	prefix := "ctrl+b"
 	d := NewDispatcher(prefix)
 
 	// Test prefix enters command mode
-	action, consumed := d.Handle(tea.KeyMsg{Type: tea.KeyCtrlA})
+	action, consumed := d.Handle(tea.KeyMsg{Type: tea.KeyCtrlB})
 	if !consumed {
 		t.Error("Prefix should be consumed")
 	}
@@ -34,9 +34,9 @@ func TestDispatcher(t *testing.T) {
 		t.Error("Should not be in command mode anymore")
 	}
 
-	// Test prefix twice sends prefix
-	d.Handle(tea.KeyMsg{Type: tea.KeyCtrlA})
-	action, consumed = d.Handle(tea.KeyMsg{Type: tea.KeyCtrlA})
+	// Test prefix twice sends prefix (literal Ctrl+B)
+	d.Handle(tea.KeyMsg{Type: tea.KeyCtrlB})
+	action, consumed = d.Handle(tea.KeyMsg{Type: tea.KeyCtrlB})
 	if !consumed {
 		t.Error("Prefix should be consumed")
 	}
@@ -51,5 +51,25 @@ func TestDispatcher(t *testing.T) {
 	}
 	if action != ActionNone {
 		t.Errorf("Expected ActionNone, got %v", action)
+	}
+
+	// Test detach action
+	d.Handle(tea.KeyMsg{Type: tea.KeyCtrlB})
+	action, consumed = d.Handle(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	if !consumed {
+		t.Error("Detach key should be consumed")
+	}
+	if action != ActionDetach {
+		t.Errorf("Expected ActionDetach, got %v", action)
+	}
+
+	// Test scrollback search action
+	d.Handle(tea.KeyMsg{Type: tea.KeyCtrlB})
+	action, consumed = d.Handle(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	if !consumed {
+		t.Error("Scrollback key should be consumed")
+	}
+	if action != ActionScrollbackSearch {
+		t.Errorf("Expected ActionScrollbackSearch, got %v", action)
 	}
 }

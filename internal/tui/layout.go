@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/ansi"
 )
 
 var (
@@ -37,36 +38,64 @@ func (m Model) View() string {
 
 	doc := strings.Builder{}
 
-	// Tabs
+	// Show error if present
+	if m.err != nil {
+		doc.WriteString(fmt.Sprintf("Error: %v\n", m.err))
+		return doc.String()
+	}
+
+	// Pager overlay
+	if m.pagerActive {
+		doc.WriteString(m.renderPager())
+		return doc.String()
+	}
+
+	// Tabs row
 	var renderedTabs []string
-	for i, t := range m.tabs {
+	for i, tab := range m.tabs {
+		title := tab.SessionID
 		style := tabStyle
 		if i == m.activeTabIndex {
 			style = activeTabStyle
 		}
-		renderedTabs = append(renderedTabs, style.Render(fmt.Sprintf("%d:%s", i+1, t)))
+		renderedTabs = append(renderedTabs, style.Render(fmt.Sprintf("%d:%s", i+1, title)))
 	}
 	tabsRow := lipgloss.JoinHorizontal(lipgloss.Top, renderedTabs...)
 	doc.WriteString(tabsRow + "\n")
 
 	// Terminal area
-	contentHeight := m.height - 4 // Tabs + Status bar + Borders
+	contentHeight := m.height - 6 // Tabs + Status bar + Borders
 	if contentHeight < 0 {
 		contentHeight = 0
 	}
-	
-	terminalContent := m.terminal
-	if m.activeTabIndex < len(m.tabs) {
-		terminalContent = fmt.Sprintf("Session: %s\n\n%s", m.tabs[m.activeTabIndex], m.terminal)
+
+	tab := m.activeTab()
+
+	// Get terminal content
+	var terminalContent string
+	if tab == nil {
+		terminalContent = "No active session"
+	} else if !tab.Connected || tab.Disconnected {
+		terminalContent = "Disconnected\n\nReconnect: Ctrl+B, c - New Tab"
+	} else {
+		tab.mu.Lock()
+		terminalContent = tab.buffer
+		tab.mu.Unlock()
 	}
 
-	window := windowStyle.
+	// Strip ANSI escapes for lipgloss rendering
+	terminalContent = stripAnsi(terminalContent)
+
+	// Set viewport content for scrolling support
+	m.viewport.SetContent(terminalContent)
+
+	rendered := windowStyle.
 		Width(m.width - 2).
 		Height(contentHeight).
-		Render(terminalContent)
-	doc.WriteString(window + "\n")
+		Render(m.viewport.View())
+	doc.WriteString(rendered + "\n")
 
-	// Status Bar
+	// Status bar
 	modeStr := " NORMAL "
 	style := statusStyle
 	if m.dispatcher.InCommand() {
@@ -76,12 +105,29 @@ func (m Model) View() string {
 
 	status := style.Render(modeStr)
 	if m.dispatcher.InCommand() {
-		status += " Waiting for command..."
+		status += " [d]etach [s]crollback [Ctrl+B] literal "
 	} else {
 		status += fmt.Sprintf(" %s - Tab %d/%d", m.dispatcher.prefix, m.activeTabIndex+1, len(m.tabs))
+		if tab != nil && !tab.Disconnected && !tab.IsPrimary {
+			status += " | Ctrl+Space: Request Control"
+		}
+	}
+
+	// Truncate status to fit width
+	if len(status) > m.width-2 {
+		status = status[:m.width-2]
 	}
 
 	doc.WriteString(status)
 
 	return doc.String()
 }
+
+// stripAnsi removes ANSI escape sequences from the given string.
+// This wraps the muesli/ansi.Strip function for use in rendering.
+func stripAnsi(s string) string {
+	return ansiStripper(s)
+}
+
+// ansiStripper is a var for testability.
+var ansiStripper = ansi.Strip

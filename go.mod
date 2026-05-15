@@ -3,10 +3,12 @@ module github.com/strickdd/refressh
 go 1.24.0
 
 require (
+	github.com/charmbracelet/bubbles v0.18.0
 	github.com/charmbracelet/bubbletea v1.3.3
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/creack/pty v1.1.24
 	github.com/gorilla/websocket v1.5.0
+	github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6
 	github.com/spf13/cobra v1.8.0
 	golang.org/x/image v0.24.0
 	golang.org/x/term v0.28.0
@@ -24,7 +26,6 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-localereader v0.0.1 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
-	github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect

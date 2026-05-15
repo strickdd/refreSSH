@@ -21,7 +21,11 @@ const (
 	// ActionCloseTab closes the current tab.
 	ActionCloseTab
 	// ActionSendPrefix sends the prefix key to the PTY.
-	ActionSendPrefix // Special action to send the prefix key itself
+	ActionSendPrefix
+	// ActionDetach detaches from the current session.
+	ActionDetach
+	// ActionScrollbackSearch opens scrollback in a pager.
+	ActionScrollbackSearch
 )
 
 // Dispatcher handles key interceptions and command mode logic.
@@ -42,6 +46,10 @@ func NewDispatcher(prefix string) *Dispatcher {
 			"c":      ActionNewTab,
 			"x":      ActionCloseTab,
 			"q":      ActionQuit,
+			"d":      ActionDetach,
+			"D":      ActionDetach,
+			"s":      ActionScrollbackSearch,
+			"S":      ActionScrollbackSearch,
 			prefix:   ActionSendPrefix,
 		},
 	}
@@ -65,7 +73,7 @@ func (d *Dispatcher) Handle(msg tea.KeyMsg) (Action, bool) {
 		return action, true
 	}
 
-	// If key is not mapped, we still consume it (it just does nothing or exits command mode)
+	// If key is not mapped, we still consume it (it just exits command mode)
 	return ActionNone, true
 }
 
