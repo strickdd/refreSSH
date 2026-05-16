@@ -44,6 +44,25 @@ cp -rf source dest          # NOT: cp -r source dest
 - `apt-get` - use `-y` flag
 - `brew` - use `HOMEBREW_NO_AUTO_UPDATE=1` env var
 
+## Agent Personas
+
+refreSSH uses specialized AI personas for different review and implementation tasks. Invoke agents by name prefix (e.g., `"Vera, review this diff"`).
+
+| Agent | Role | Files |
+|-------|------|-------|
+| **Marcus** (TPM) | Planning, triaging, beads management | `.github/agents/tpm.md` |
+| **Naomi** (Go Expert) | Systems programming and PTY management | `.github/agents/go-engineer.md` |
+| **Jarnathan** (DevSecOps) | Security, CI/CD, deployment implementation | `.github/agents/devsecops.md` |
+| **Vera** (Adversarial Review) | General code correctness, data flow, design flaws | `.github/agents/vera.md`, `.github/skills/code-review.md` |
+| **Penelope** (Security Deep-Dive) | Security analysis: auth, crypto, attack surface | `.github/agents/penelope.md` |
+| **Riley** (CI Monitor) | Local CI/CD monitoring via `gh` CLI | `.github/agents/riley.md`, `.github/skills/ci-monitor.md` |
+
+### Invocation Rules
+- Call agents by name: `"Vera, review this diff"` or `"Penelope, audit auth flow"`
+- Vera + Penelope can be called together for security-impact changes
+- Riley operates via `.github/skills/ci-monitor.md` skill using local `gh` CLI
+- Skills are invoked via `bd skills list` and selected by name
+
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:ca08a54f -->
 ## Beads Issue Tracker
 

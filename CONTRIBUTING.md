@@ -37,7 +37,10 @@ We use **Beads (`bd`)** for all task tracking.
 The project utilizes specialized AI personas:
 - **Marcus (TPM):** Planning, triaging, and beads management.
 - **Naomi (Go Expert):** Systems programming and PTY management.
-- **Jarnathan (DevSecOps):** Security, CI/CD, and deployment.
+- **Jarnathan (DevSecOps):** Security, CI/CD, and deployment implementation.
+- **Vera (Adversarial Review):** General code correctness, data flow, design flaws, edge cases.
+- **Penelope (Security Deep-Dive):** Security analysis: authentication, cryptography, attack surface.
+- **Riley (CI Monitor):** Local CI/CD monitoring via `gh` CLI — sleep-and-check pattern.
 
 ---
 *This file is a living document. Suggestions for improvement are always welcome.*

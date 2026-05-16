@@ -49,6 +49,20 @@ bd close <id>         # Complete work
 - If push fails, resolve and retry until it succeeds
 <!-- END BEADS INTEGRATION -->
 
+## Agent Personas
+
+| Agent | Role | Files |
+|-------|------|-------|
+| **Marcus** (TPM) | Planning, triaging, beads management | `.github/agents/tpm.md` |
+| **Naomi** (Go Expert) | Systems programming and PTY management | `.github/agents/go-engineer.md` |
+| **Jarnathan** (DevSecOps) | Security, CI/CD, deployment | `.github/agents/devsecops.md` |
+| **Vera** (Adversarial Review) | Code correctness, data flow, design review | `.github/agents/vera.md`, `.github/skills/code-review.md` |
+| **Penelope** (Security Deep-Dive) | Security: auth, crypto, attack surface | `.github/agents/penelope.md` |
+| **Riley** (CI Monitor) | Local CI/CD monitoring via `gh` CLI | `.github/agents/riley.md`, `.github/skills/ci-monitor.md` |
+
+Invoke by name: `"Vera, review this diff"` or `"Penelope, audit auth flow"`.
+Call Vera + Penelope together for security-impact changes.
+Riley uses `.github/skills/ci-monitor.md` — no new workflow files needed.
 
 ## Build & Test
 
