@@ -84,7 +84,9 @@ func (m Model) View() string {
 		tab.mu.Unlock()
 	}
 
-	// Strip ANSI escapes for lipgloss rendering
+	// Strip ANSI escapes for lipgloss rendering.
+	// TODO: For full terminal emulation (color, cursor positioning, screen clearing),
+	// integrate a vt10x terminal emulator like hinshun/vt10x and render the resulting screen.
 	terminalContent = stripAnsi(terminalContent)
 
 	// Set viewport content for scrolling support

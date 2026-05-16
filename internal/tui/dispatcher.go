@@ -50,7 +50,6 @@ func NewDispatcher(prefix string) *Dispatcher {
 			"D":      ActionDetach,
 			"s":      ActionScrollbackSearch,
 			"S":      ActionScrollbackSearch,
-			prefix:   ActionSendPrefix,
 		},
 	}
 }
@@ -69,6 +68,9 @@ func (d *Dispatcher) Handle(msg tea.KeyMsg) (Action, bool) {
 
 	// We are in command mode
 	d.inCommand = false // Always exit command mode after next key
+	if keyStr == d.prefix {
+		return ActionSendPrefix, true
+	}
 	if action, ok := d.keyMappings[keyStr]; ok {
 		return action, true
 	}

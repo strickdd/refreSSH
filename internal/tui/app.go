@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"runtime"
 	"sync"
 	"time"
 
@@ -102,8 +103,18 @@ type SessionSummary struct {
 const (
 	maxScrollback = 1024 * 1024
 	connWriteWait = 10 * time.Second
-	defaultShell  = "bash"
 )
+
+//go:generate go run golang.org/x/tools/go/analysis/passes/embedcmd/cmd/generate -tag embed
+
+func defaultShell() string {
+	switch runtime.GOOS {
+	case "windows":
+		return "pwsh"
+	default:
+		return "bash"
+	}
+}
 
 // InitialModel initializes the TUI model.
 func InitialModel() Model {
@@ -130,6 +141,7 @@ func InitialModel() Model {
 		token:             token,
 		scrollbackPager:   newRingBuffer(maxScrollback),
 		availableSessions: make([]SessionSummary, 0),
+		viewport:          viewport.New(80, 24),
 	}
 }
 
@@ -181,7 +193,7 @@ func (m *Model) createSessionAndConnect(sessionID *string) {
 			go func() {
 				reqBody, _ := json.Marshal(map[string]interface{}{
 					"id":      sid,
-					"command": defaultShell,
+					"command": defaultShell(),
 				})
 				req, _ := http.NewRequest("POST", fmt.Sprintf("%s/sessions", m.apiURL), bytes.NewBuffer(reqBody))
 				req.Header.Set("Authorization", "Bearer "+m.token)
