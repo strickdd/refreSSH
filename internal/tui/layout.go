@@ -40,7 +40,7 @@ func (m Model) View() string {
 
 	// Show error if present
 	if m.err != nil {
-		doc.WriteString(fmt.Sprintf("Error: %v\n", m.err))
+		fmt.Fprintf(&doc, "Error: %v\n", m.err)
 		return doc.String()
 	}
 
@@ -73,11 +73,12 @@ func (m Model) View() string {
 
 	// Get terminal content
 	var terminalContent string
-	if tab == nil {
+	switch {
+	case tab == nil:
 		terminalContent = "No active session"
-	} else if !tab.Connected || tab.Disconnected {
+	case !tab.Connected || tab.Disconnected:
 		terminalContent = "Disconnected\n\nReconnect: Ctrl+B, c - New Tab"
-	} else {
+	default:
 		tab.mu.Lock()
 		terminalContent = tab.buffer
 		tab.mu.Unlock()

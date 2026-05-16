@@ -152,7 +152,7 @@ func (m *Model) fetchSessions() {
 	if err != nil {
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	var sessions []SessionSummary
 	if err := json.NewDecoder(resp.Body).Decode(&sessions); err != nil {
@@ -191,9 +191,9 @@ func (m *Model) createSessionAndConnect(sessionID *string) {
 				if err != nil {
 					return
 				}
-				defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
-				if resp.StatusCode == http.StatusCreated {
+			if resp.StatusCode == http.StatusCreated {
 					m.fetchSessions()
 				}
 			}()
@@ -242,7 +242,7 @@ func (m *Model) createSessionAndConnect(sessionID *string) {
 func (m *Model) readLoop(tab *Tab) {
 	defer func() {
 		if tab.Conn != nil {
-			tab.Conn.Close()
+			_ = tab.Conn.Close()
 		}
 		tab.Connected = false
 		tab.Disconnected = true
@@ -267,7 +267,7 @@ func (m *Model) readLoop(tab *Tab) {
 		tab.buffer += string(message)
 		tab.mu.Unlock()
 
-		m.scrollbackPager.Write(message)
+		_, _ = m.scrollbackPager.Write(message)
 	}
 }
 
@@ -282,7 +282,7 @@ func (m *Model) getPort() int {
 		return 8080
 	}
 	var port int
-	fmt.Sscanf(portStr[colonIdx+1:], "%d", &port)
+	_, _ = fmt.Sscanf(portStr[colonIdx+1:], "%d", &port)
 	return port
 }
 
@@ -293,10 +293,12 @@ func (m Model) activeTab() *Tab {
 	return m.tabs[m.activeTabIndex]
 }
 
+// Init implements tea.Model.
 func (m Model) Init() tea.Cmd {
 	return m.fetchSessionsCmd()
 }
 
+// Update implements tea.Model.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if m.quit {
 		return m, tea.Quit
@@ -387,7 +389,7 @@ func (m Model) handleAction(action Action) (tea.Model, tea.Cmd) {
 		if len(m.tabs) > 1 {
 			tab := m.tabs[m.activeTabIndex]
 			if tab.Conn != nil {
-				tab.Conn.Close() //nolint:errcheck
+				_ = tab.Conn.Close()
 			}
 			go func() {
 				u := fmt.Sprintf("%s/sessions/%s", m.apiURL, tab.SessionID)
@@ -395,7 +397,7 @@ func (m Model) handleAction(action Action) (tea.Model, tea.Cmd) {
 				req.Header.Set("Authorization", "Bearer "+m.token)
 				resp, err := http.DefaultClient.Do(req)
 				if err == nil && resp != nil {
-					resp.Body.Close()
+					_ = resp.Body.Close()
 				}
 			}()
 
@@ -413,7 +415,7 @@ func (m Model) handleAction(action Action) (tea.Model, tea.Cmd) {
 
 	case ActionDetach:
 		if tab := m.activeTab(); tab != nil && tab.Conn != nil {
-			tab.Conn.Close() //nolint:errcheck
+			_ = tab.Conn.Close()
 		}
 		if len(m.tabs) > 1 {
 			m.tabs = append(m.tabs[:m.activeTabIndex], m.tabs[m.activeTabIndex+1:]...)
@@ -500,45 +502,6 @@ func (m *Model) reorderTabsMRU() {
 	m.activeTabIndex = len(m.tabs) - 1
 }
 
-
-
-func (m Model) renderTabs() string {
-	var rendered []string
-	for i, tab := range m.tabs {
-		title := tab.SessionID
-		style := tabStyle
-		if i == m.activeTabIndex {
-			style = activeTabStyle
-		}
-		rendered = append(rendered, style.Render(fmt.Sprintf("%d:%s", i+1, title)))
-	}
-	return lipgloss.JoinHorizontal(lipgloss.Top, rendered...)
-}
-
-func (m Model) renderStatus(tab *Tab) string {
-	modeStr := " NORMAL "
-	style := statusStyle
-	if m.dispatcher.InCommand() {
-		modeStr = " COMMAND "
-		style = commandModeStyle
-	}
-
-	status := style.Render(modeStr)
-	if m.dispatcher.InCommand() {
-		status += " [d]etach [s]crollback [Ctrl+B] literal "
-	} else {
-		status += fmt.Sprintf(" %s - Tab %d/%d", m.dispatcher.prefix, m.activeTabIndex+1, len(m.tabs))
-		if tab != nil && !tab.Disconnected && !tab.IsPrimary {
-			status += " | Ctrl+Space: Request Control"
-		}
-	}
-
-	if len(status) > m.width-2 {
-		status = status[:m.width-2]
-	}
-
-	return status
-}
 
 func (m Model) renderPager() string {
 	doc := ""
