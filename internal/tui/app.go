@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/bubbles/viewport"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/gorilla/websocket"
 	"github.com/strickdd/refressh/internal/config"
@@ -502,7 +502,6 @@ func (m *Model) reorderTabsMRU() {
 	m.tabs = append(m.tabs, tab)
 	m.activeTabIndex = len(m.tabs) - 1
 }
-
 
 func (m Model) renderPager() string {
 	doc := ""
