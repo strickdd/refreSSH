@@ -39,7 +39,7 @@ func TestRingBuffer_Concurrent(t *testing.T) {
 
 	go func() {
 		for i := 0; i < 1000; i++ {
-			rb.Write([]byte("x"))
+			_, _ = rb.Write([]byte("x"))
 		}
 		done <- struct{}{}
 	}()
