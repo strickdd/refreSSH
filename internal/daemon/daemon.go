@@ -128,19 +128,16 @@ func (d *Daemon) StopSession(id string) error {
 	}
 
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	if s.Running {
 		if s.cmd != nil && s.cmd.Process != nil {
-			// Try to terminate gracefully, then kill
 			_ = s.cmd.Process.Kill() //nolint:errcheck
 		}
 		s.Running = false
 	}
-
 	if s.pty != nil {
 		_ = s.pty.Close() //nolint:errcheck
 	}
+	s.mu.Unlock()
 
 	s.Broadcaster.Close()
 
