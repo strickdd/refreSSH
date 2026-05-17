@@ -134,7 +134,7 @@ func Handler(d *daemon.Daemon) http.HandlerFunc {
 		conn.SetReadDeadline(time.Now().Add(readWait))
 
 		// Set close handler to ignore close frames (we manage close lifecycle)
-		conn.SetCloseHandler(func(code int, text string) error {
+		conn.SetCloseHandler(func(_ int, _ string) error {
 			return nil
 		})
 
@@ -183,6 +183,6 @@ func Handler(d *daemon.Daemon) http.HandlerFunc {
 		close(quit)
 		fmt.Printf("Client %s disconnected from session %s\n", clientID, sessionID)
 		s.Broadcaster.RemoveClient(clientID)
-		conn.Close() //nolint:errcheck
+		conn.Close() //nolint:errcheck,gosec
 	}
 }

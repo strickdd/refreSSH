@@ -31,6 +31,7 @@ type clientState struct {
 	send       chan []byte
 	quit       chan struct{}
 	writeError chan struct{}
+	removed    chan struct{}
 	wg         sync.WaitGroup
 }
 
@@ -82,6 +83,7 @@ func (b *Broadcaster) AddClient(c Client) {
 		send:       make(chan []byte, clientBufferSize),
 		quit:       make(chan struct{}),
 		writeError: make(chan struct{}, 1),
+		removed:    make(chan struct{}),
 	}
 	b.clients[c.ID()] = state
 
@@ -129,7 +131,7 @@ func (b *Broadcaster) removeDeadClients() {
 func (b *Broadcaster) RemoveClient(id string) {
 	b.mu.Lock()
 	if state, ok := b.clients[id]; ok {
-		close(state.quit)
+		close(state.removed)
 		b.mu.Unlock()
 		state.wg.Wait()
 		b.mu.Lock()
@@ -138,7 +140,6 @@ func (b *Broadcaster) RemoveClient(id string) {
 
 	if b.primaryClientID == id {
 		b.primaryClientID = ""
-		// Promote another client if available
 		for nextID := range b.clients {
 			b.primaryClientID = nextID
 			break
@@ -174,6 +175,7 @@ func (b *Broadcaster) Close() {
 	for _, state := range b.clients {
 		states = append(states, state)
 		close(state.quit)
+		close(state.removed)
 	}
 	b.mu.Unlock()
 
@@ -230,7 +232,7 @@ func (b *Broadcaster) clientWriteLoop(state *clientState) {
 				}
 				return
 			}
-		case <-state.quit:
+		case <-state.removed:
 			return
 		}
 	}
