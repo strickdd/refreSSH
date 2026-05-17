@@ -30,6 +30,7 @@ type clientState struct {
 	client Client
 	send   chan []byte
 	quit   chan struct{}
+	remove chan struct{}
 	wg     sync.WaitGroup
 }
 
@@ -79,6 +80,7 @@ func (b *Broadcaster) AddClient(c Client) {
 		client: c,
 		send:   make(chan []byte, clientBufferSize),
 		quit:   make(chan struct{}),
+		remove: make(chan struct{}),
 	}
 	b.clients[c.ID()] = state
 
@@ -89,8 +91,10 @@ func (b *Broadcaster) AddClient(c Client) {
 		state.send <- sbCopy
 	}
 
-	state.wg.Add(1)
+	state.wg.Add(2)
 	go b.clientWriteLoop(state)
+
+	go b.cleanupLoop(state)
 
 	// If no primary client, make this one primary
 	if b.primaryClientID == "" {
@@ -167,20 +171,27 @@ func (b *Broadcaster) updateClientStatuses() {
 	type target struct {
 		c         Client
 		isPrimary bool
+		state     *clientState
 	}
 	var targets []target
 	for id, state := range b.clients {
 		targets = append(targets, target{
 			c:         state.client,
 			isPrimary: id == b.primaryClientID,
+			state:     state,
 		})
 	}
 	b.mu.RUnlock()
 
 	for _, t := range targets {
-		_ = t.c.SendStatus(Status{
+		if err := t.c.SendStatus(Status{
 			IsPrimary: t.isPrimary,
-		}) //nolint:errcheck
+		}); err != nil {
+			select {
+			case t.state.remove <- struct{}{}:
+			default:
+			}
+		}
 	}
 }
 
@@ -190,7 +201,46 @@ func (b *Broadcaster) clientWriteLoop(state *clientState) {
 		select {
 		case data := <-state.send:
 			if _, err := state.client.Write(data); err != nil {
+				select {
+				case state.remove <- struct{}{}:
+				default:
+				}
 				return
+			}
+		case <-state.quit:
+			return
+		}
+	}
+}
+
+func (b *Broadcaster) cleanupLoop(state *clientState) {
+	defer state.wg.Done()
+	for {
+		select {
+		case <-state.remove:
+			b.mu.Lock()
+			close(state.quit)
+			if b.clients[state.client.ID()] == state {
+				delete(b.clients, state.client.ID())
+			}
+			if b.primaryClientID == state.client.ID() {
+				b.primaryClientID = ""
+				for nextID := range b.clients {
+					b.primaryClientID = nextID
+					break
+				}
+			}
+			primary := b.primaryClientID
+			b.mu.Unlock()
+
+			b.mu.RLock()
+			var targets []Client
+			for _, s := range b.clients {
+				targets = append(targets, s.client)
+			}
+			b.mu.RUnlock()
+			for _, t := range targets {
+				_ = t.SendStatus(Status{IsPrimary: t.ID() == primary}) //nolint:errcheck
 			}
 		case <-state.quit:
 			return

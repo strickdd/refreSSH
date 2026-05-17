@@ -1,5 +1,6 @@
 // Package ws provides WebSocket-based terminal attachment handlers.
 package ws
+
 import (
 	"encoding/json"
 	"fmt"
@@ -30,6 +31,12 @@ var upgrader = websocket.Upgrader{
 const (
 	// writeWait is the maximum time to wait for a message to be written.
 	writeWait = 10 * time.Second
+	// readWait is the idle timeout for WebSocket reads (60s).
+	readWait = 60 * time.Second
+	// pingPeriod is how often to send pings (readWait * 9 / 10).
+	pingPeriod = (readWait * 9) / 10
+	// pongWait is how long to wait for a pong before considering the connection dead.
+	pongWait = readWait + 6*time.Second
 )
 
 // Client wraps a WebSocket connection to satisfy the daemon.Client interface.
@@ -98,6 +105,45 @@ func Handler(d *daemon.Daemon) http.HandlerFunc {
 		}
 		defer conn.Close() //nolint:errcheck
 
+		conn.SetReadDeadline(time.Now().Add(readWait))
+		conn.SetCloseHandler(func(code int, text string) error {
+			_ = conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(code, "")) //nolint:errcheck
+			return nil
+		})
+
+		lastPong := time.Now().Add(-pongWait)
+		mu := sync.Mutex{}
+		conn.SetPongHandler(func(string) error {
+			mu.Lock()
+			defer mu.Unlock()
+			lastPong = time.Now()
+			return conn.SetReadDeadline(time.Now().Add(readWait))
+		})
+
+		go func() {
+			defer func() { recover() }()
+			ticker := time.NewTicker(pingPeriod)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					mu.Lock()
+					if time.Since(lastPong) > pongWait {
+						mu.Unlock()
+						_ = conn.WriteMessage(websocket.CloseMessage,
+							websocket.FormatCloseMessage(websocket.CloseGoingAway, "")) //nolint:errcheck
+						return
+					}
+					mu.Unlock()
+
+					_ = conn.SetWriteDeadline(time.Now().Add(writeWait))
+					if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+						return
+					}
+				}
+			}
+		}()
+
 		// Use remote address as client ID for uniqueness within this session
 		clientID := r.RemoteAddr
 		client := NewWSClient(clientID, conn)
@@ -114,6 +160,10 @@ func Handler(d *daemon.Daemon) http.HandlerFunc {
 		for {
 			msgType, message, err := conn.ReadMessage()
 			if err != nil {
+				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway,
+					websocket.CloseNormalClosure, websocket.CloseAbnormalClosure) {
+					fmt.Printf("WebSocket error for client %s: %v\n", clientID, err)
+				}
 				break
 			}
 
