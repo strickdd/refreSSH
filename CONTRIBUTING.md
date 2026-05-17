@@ -36,11 +36,13 @@ We use **Beads (`bd`)** for all task tracking.
 ## Agent Personas
 The project utilizes specialized AI personas:
 - **Marcus (TPM):** Planning, triaging, and beads management.
-- **Naomi (Go Expert):** Systems programming and PTY management.
+- **Naomi (Go Expert):** Systems programming, PTY, TUI, and config.
 - **Jarnathan (DevSecOps):** Security, CI/CD, and deployment implementation.
-- **Vera (Adversarial Review):** General code correctness, data flow, design flaws, edge cases.
-- **Penelope (Security Deep-Dive):** Security analysis: authentication, cryptography, attack surface.
-- **Riley (CI Monitor):** Local CI/CD monitoring via `gh` CLI — sleep-and-check pattern.
+- **Penelope (DevSecOps Reviewer):** Adversarial security review — auth, crypto, injection, attack surface.
+- **Vera (Code Reviewer):** Adversarial code review — design, data flow, correctness, edge cases.
+- **Riley (DevOps Monitor):** Local CI/CD build watching and failure diagnosis.
+
+**Invocation:** Name the persona explicitly in your request (e.g., "Vera, review this diff"). Vera handles general review; Penelope handles security deep-dives. Use both for security-impact changes.
 
 ---
 *This file is a living document. Suggestions for improvement are always welcome.*

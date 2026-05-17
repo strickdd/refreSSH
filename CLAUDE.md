@@ -2,7 +2,7 @@
 
 This file provides instructions and context for AI coding agents working on this project.
 
-<!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:ca08a54f -->
+<!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:7510c1e2 -->
 ## Beads Issue Tracker
 
 This project uses **bd (beads)** for issue tracking. Run `bd prime` to see full workflow context and commands.
@@ -22,6 +22,8 @@ bd close <id>         # Complete work
 - Run `bd prime` for detailed command reference and session close protocol
 - Use `bd remember` for persistent knowledge — do NOT use MEMORY.md files
 
+**Architecture in one line:** issues live in a local Dolt DB; sync uses `refs/dolt/data` on your git remote; `.beads/issues.jsonl` is a passive export. See https://github.com/gastownhall/beads/blob/main/docs/SYNC_CONCEPTS.md for details and anti-patterns.
+
 ## Session Completion
 
 **When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
@@ -34,7 +36,6 @@ bd close <id>         # Complete work
 4. **PUSH TO REMOTE** - This is MANDATORY:
    ```bash
    git pull --rebase
-   bd dolt push
    git push
    git status  # MUST show "up to date with origin"
    ```
@@ -51,32 +52,63 @@ bd close <id>         # Complete work
 
 ## Agent Personas
 
-| Agent | Role | Files |
-|-------|------|-------|
-| **Marcus** (TPM) | Planning, triaging, beads management | `.github/agents/tpm.md` |
-| **Naomi** (Go Expert) | Systems programming and PTY management | `.github/agents/go-engineer.md` |
-| **Jarnathan** (DevSecOps) | Security, CI/CD, deployment | `.github/agents/devsecops.md` |
-| **Vera** (Adversarial Review) | Code correctness, data flow, design review | `.github/agents/vera.md`, `.github/skills/code-review.md` |
-| **Penelope** (Security Deep-Dive) | Security: auth, crypto, attack surface | `.github/agents/penelope.md` |
-| **Riley** (CI Monitor) | Local CI/CD monitoring via `gh` CLI | `.github/agents/riley.md`, `.github/skills/ci-monitor.md` |
+This project uses specialized AI personas defined in `.github/agents/`. Invoke a persona by naming it explicitly at the start of your request (e.g., "Vera, review this diff" or "Riley, monitor the CI build for PR #12").
 
-Invoke by name: `"Vera, review this diff"` or `"Penelope, audit auth flow"`.
-Call Vera + Penelope together for security-impact changes.
-Riley uses `.github/skills/ci-monitor.md` — no new workflow files needed.
+| Persona | Role | When to Invoke |
+|---------|------|----------------|
+| **Marcus** | TPM — planning, triaging, beads management | Breaking down features, managing backlog, release planning |
+| **Naomi** | Go Expert — systems programming, PTY, TUI, config | Implementing features, fixing bugs, writing Go code |
+| **Jarnathan** | DevSecOps — security, CI/CD, deployment implementer | Setting up CI/CD, writing deployment scripts, security features |
+| **Penelope** | DevSecOps reviewer — adversarial security assessment | Reviewing security-critical code, auth, crypto, attack surface analysis |
+| **Vera** | Adversarial code reviewer — design, data flow, correctness | Pre-PR code review, architecture review, data flow analysis, edge case discovery |
+| **Riley** | DevOps monitor — local CI/CD build watcher | Monitoring PR builds, diagnosing CI failures, checking Copilot comments |
+
+**Invocation rules:**
+- Name the persona explicitly: "Penelope, review this PR" triggers the security reviewer
+- Use **Vera** for general code review (design, correctness, data flow)
+- Use **Penelope** when security is a concern (auth, crypto, injection, privilege escalation)
+- Use **Vera + Penelope** together for PRs with security impact
+- Use **Riley** to watch CI builds after pushing changes
+- Use **Marcus** for task planning and beads management
 
 ## Build & Test
 
-_Add your build and test commands here_
-
 ```bash
-# Example:
-# npm install
-# npm test
+# Install dependencies
+go mod tidy
+
+# Run linter
+golangci-lint run --timeout=5m ./...
+
+# Run all tests (parallel, with race detector, across all platforms)
+go test -v -race -p 4 ./...
+
+# Build
+go build ./cmd/refressh
+
+# Cross-platform build
+GOOS=linux GOARCH=amd64 go build -o dist/refressh_linux_amd64 ./cmd/refressh
+GOOS=windows GOARCH=amd64 go build -o dist/refressh_windows_amd64.exe ./cmd/refressh
+GOOS=darwin GOARCH=arm64 go build -o dist/refressh_darwin_arm64 ./cmd/refressh
 ```
 
 ## Architecture Overview
 
-_Add a brief overview of your project architecture_
+**refreSSH** is a CLI tool and daemon for managing remote SSH sessions with a local-first, security-focused design.
+
+**Core components:**
+- **CLI** (`cmd/refressh/`, `internal/cli/`) — Cobra-based CLI with subcommands for attach, create, daemon, list, sandbox, stop, tui, and ui
+- **Daemon** (`internal/daemon/`) — Background process that manages session lifecycles, PTY allocation, and output broadcasting to multiple clients
+- **REST API + WebSocket** (`internal/api/`) — Local-only (127.0.0.1) server with auth middleware, REST endpoints for session management, and WebSocket for PTY data streaming
+- **TUI** (`internal/tui/`) — Bubble Tea-based terminal UI with tab navigation, command mode, scrollback buffer, and primary/VIEW-only control
+- **Config** (`internal/config/`) — OS-standard config locations (AppData\.refreSSH on Windows, ~/.refreSSH on Unix)
+- **Sandbox** (`cmd/refressh/sandbox.go`, `deploy/sandbox/`) — Docker-based containerized sandbox deployments
+
+**Key flows:**
+1. CLI `refressh attach` connects to a running daemon via the local REST API
+2. Daemon allocates a PTY, spawns a shell, and broadcasts output to all connected clients
+3. WebSocket provides real-time bidirectional PTY data for TUI sessions
+4. Primary controller model ensures only one client has input access; others are VIEW-only
 
 ## Conventions & Patterns
 
@@ -84,4 +116,9 @@ _Add a brief overview of your project architecture_
   - **PowerShell (Windows):** Use `;` instead of `&&` for chaining commands (e.g., `cmd1; cmd2`).
   - **Unix (Linux/macOS):** Use `&&` for conditional chaining.
   - **Guidance:** Always determine the current OS before executing chained commands. Prefer single commands or multiple tool calls when possible to avoid shell-specific syntax issues.
-- **Go Patterns:** Use standard `gofmt` and idiomatic Go practices.
+- **Go Patterns:** Use standard `gofmt` and idiomatic Go practices. Standard library first, minimal external dependencies.
+- **Platform-Specific Code:** Use `_windows.go` and `_unix.go` suffixes only when necessary, hidden behind clean interfaces.
+- **Configuration:** Windows uses `AppData\.refreSSH`, Unix uses `~/.refreSSH`.
+- **Error Handling:** Explicit error handling — no `panic` unless truly unrecoverable.
+- **Naming:** Use "refreSSH" (proper casing) in all documentation and UI text.
+- **Security:** Bind APIs to `127.0.0.1` by default. No sensitive data in logs.

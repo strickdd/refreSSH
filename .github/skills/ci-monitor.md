@@ -1,81 +1,160 @@
-# CI Monitoring Skill
+# Skill: CI/CD Monitor
 
 ## Purpose
-Monitor GitHub Actions CI/CD pipelines locally using the `gh` CLI. Provide proactive status checks and failure diagnosis without requiring developers to manually check the GitHub web UI.
+Standard procedure for Riley (DevOps Engineer) to monitor and diagnose CI/CD builds locally using a sleep-and-check pattern.
 
 ## Prerequisites
-- `gh` CLI installed and authenticated (`gh auth status`)
-- Repository accessible via `gh`
-- Target PR number or branch identified
+- GitHub CLI (`gh`) installed and authenticated
+- The PR number or branch name being monitored
+- The workflow name to monitor (e.g., "CI" or "Release")
 
-## Procedures
+## Phase 1: Sleep-and-Check Monitoring Loop
 
-### Quick Status Check
+### Start Monitoring
+
+1. **Get the branch or PR context:**
+   ```bash
+   # For PR
+   gh pr view --json number,headRefName
+   
+   # For current branch
+   git branch --show-current
+   ```
+
+2. **Enter the monitoring loop** (pseudo-code for the agent):
+   ```
+   branch = <branch name or PR head ref>
+   timeout = 20 minutes
+   interval = 15 seconds
+   start_time = now()
+   
+   while (now() - start_time) < timeout:
+       runs = gh run list --branch <branch> --status conclusion --limit 3 --json conclusion,status,created_at,name,id
+       
+       for each run in runs:
+           if run.status == 'completed':
+               if run.conclusion == 'success':
+                   output STATUS: all_clear
+                   output STATUS: monitoring_complete
+                   return SUCCESS
+               elif run.conclusion == 'failure':
+                   output STATUS: failure_detected
+                   run_id = run.id
+                   goto Phase 2
+               elif run.conclusion == 'cancelled':
+                   output STATUS: monitoring_complete
+                   output ROOT_CAUSE: Workflow was cancelled
+                   return CANCELLED
+               elif run.conclusion == 'timed_out':
+                   output STATUS: failure_detected
+                   output FAILURE_TYPE: timeout
+                   run_id = run.id
+                   goto Phase 2
+       
+       sleep <interval>
+   
+   output STATUS: monitoring_complete
+   output FAILURE_TYPE: timeout
+   output ROOT_CAUSE: Monitoring timed out after 20 minutes
+   return TIMEOUT
+   ```
+
+### Key Commands for the Loop
+
 ```bash
-gh run list --repo strickdd/refreSSH --branch <branch-or-pr> --json status,conclusion,createdAt,title --limit 5
+# Check latest runs for a branch - returns completed runs with conclusion
+gh run list --repo <owner>/<repo> --branch <branch> --status conclusion --limit 3 --json conclusion,status,created_at,name,id
+
+# For PR-specific monitoring
+gh run list --repo <owner>/<repo> --pr <number> --status conclusion --limit 3 --json conclusion,status,created_at,name,id
 ```
 
-### Detailed Run View
+## Phase 2: Diagnose Failures
+
+Once a failure is detected, diagnose it.
+
+### 1. Get Log Output
+
 ```bash
-# List runs
-gh run list --repo strickdd/refreSSH --branch <branch> --json status,conclusion,createdAt,id --limit 3
-
-# View a specific run
-gh run view <run_id> --repo strickdd/refreSSH --json status,conclusion,jobs --jq '.jobs[] | {name: .name, status: .status, conclusion: .conclusion}'
+# Download and stream failed job logs
+gh run view <run_id> --repo <owner>/<repo> --log-failed > /tmp/gh-logs/log.txt
 ```
 
-### Failed Job Logs
+### 2. Analyze Logs
+
+Search for failure patterns:
+
 ```bash
-gh run view <run_id> --repo strickdd/refreSSH --log-failed
+# Test failures
+rg "FAIL" /tmp/gh-logs/log.txt -n
+
+# Panics
+rg "panic:" /tmp/gh-logs/log.txt -n -i
+
+# Compilation errors
+rg "cannot find package|undefined|syntax" /tmp/gh-logs/log.txt -n -i
+
+# Lint errors
+rg "golangci-lint" /tmp/gh-logs/log.txt -n -A 5
+
+# Timeout errors
+rg "timeout|deadline exceeded" /tmp/gh-logs/log.txt -n -i
+
+# Race detector output
+rg "race|DATA RACE" /tmp/gh-logs/log.txt -n -i
+
+# Build errors
+rg "build|link" /tmp/gh-logs/log.txt -n -i
 ```
 
-### Watch a Run to Completion
+### 3. Identify Root Cause
+
+Determine:
+- **Failure type:** test_failure | lint_error | compilation_error | timeout | race_condition | platform_specific | other
+- **Exact location:** file:line from error output
+- **Root cause:** what went wrong and why
+- **Scope:** one-off flaky failure or consistent issue
+
+### 4. Suggest a Fix
+
+- **Compilation error:** Missing import, wrong type, syntax issue. Suggest the exact correction.
+- **Test failure:** Assertion that failed. Suggest whether the test is wrong or the code is wrong.
+- **Lint error:** Rule violated. Suggest the code change or linter config adjustment.
+- **Timeout:** Operation timing out. Suggest optimization or timeout adjustment.
+- **Race condition:** Shared state issue. Suggest synchronization or refactoring.
+- **Platform-specific:** Platform assumption. Suggest a platform-agnostic solution.
+
+## Phase 3: Copilot Comment Detection
+
 ```bash
-gh run watch <run_id> --repo strickdd/refreSSH --timeout 300
+# Check PR for Copilot comments
+gh pr reviews <pr_number> --repo <owner>/<repo> --json body,author,submittedAt
+gh pr comment <pr_number> --repo <owner>/<repo> --json body,author,createdAt
 ```
 
-### Rerun Failed Jobs
-```bash
-gh run rerun <run_id> --failed --repo strickdd/refreSSH
+Filter for comments where `author.login == 'copilot'` or body contains "copilot".
+
+Include in output:
+- Comment text
+- Author
+- Timestamp
+
+## Output Report
+
+Produce the final structured report to stdout:
+
+```
+FAILURE_TYPE: <test_failure|lint_error|compilation_error|timeout|race_condition|platform_specific|none>
+ROOT_CAUSE: <concise description of what failed and why>
+LOCATION: <file:line or workflow job name>
+SUGGESTED_FIX: <actionable recommendation>
+COPILOT_COMMENTS: <none | list of copilot comments with body, author, timestamp>
+STATUS: <monitoring_complete|failure_detected|all_clear>
 ```
 
-### PR Status Summary
-```bash
-# Get PR number from branch
-PR_NUM=$(gh pr list --repo strickdd/refreSSH --head <branch> --json number --jq '.[0].number')
-
-# Get latest run for the PR
-RUN_ID=$(gh run list --repo strickdd/refreSSH --pr $PR_NUM --json id --jq '.[0].id')
-
-# Check status
-gh run view $RUN_ID --repo strickdd/refreSSH
-```
-
-## Failure Diagnosis Workflow
-
-1. **Identify the failure**: Run `gh run view <id> --log-failed`
-2. **Categorize**:
-   - Compile error → Check syntax, missing imports, type mismatches
-   - Test failure → Identify the specific test, run it locally with `go test -v -run <TestName>`
-   - Lint failure → Run `golangci-lint run ./...` locally
-   - Timeout → Check for goroutine leaks or blocking operations
-3. **Compare**: `git diff origin/main...HEAD` to see if the change could cause the failure
-4. **Recommend**: Suggest specific fix or whether it's a pre-existing flake
-
-## Report Template
-```
-## CI Status: [PASSED|FAILED|IN PROGRESS]
-Branch: <branch>
-Run ID: <id>
-Started: <timestamp>
-
-## Results
-- Job 1: [passed/failed/skipped]
-- Job 2: [passed/failed/skipped]
-
-## Failure Details (if applicable)
-[Key error message from failing job]
-
-## Recommendation
-[Specific next step: fix X, rerun Y, investigate Z]
-```
+## Invocation
+- Call this skill when a PR is created/updated and CI runs need monitoring
+- Call this skill after code changes are pushed to verify the build passes
+- Call this skill when a release tag push triggers workflow runs
+- Runs as a subagent within opencode — output goes to calling agent's stdout
+- Uses `gh` CLI locally — no GitHub Actions workflows involved

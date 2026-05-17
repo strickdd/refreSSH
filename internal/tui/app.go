@@ -7,11 +7,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"runtime"
 	"sync"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/bubbles/viewport"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/gorilla/websocket"
 	"github.com/strickdd/refressh/internal/config"
@@ -34,7 +35,6 @@ type Tab struct {
 	IsPrimary    bool
 	Connected    bool
 	Disconnected bool
-	Title        string
 	buffer       string
 	mu           sync.Mutex
 }
@@ -86,6 +86,7 @@ type Model struct {
 	pagerBuffer       []byte
 	pagerMsg          string
 	apiURL            string
+	port              int
 	token             string
 	scrollbackPager   *ringBuffer
 	viewport          viewport.Model
@@ -102,8 +103,16 @@ type SessionSummary struct {
 const (
 	maxScrollback = 1024 * 1024
 	connWriteWait = 10 * time.Second
-	defaultShell  = "bash"
 )
+
+func defaultShell() string {
+	switch runtime.GOOS {
+	case "windows":
+		return "pwsh"
+	default:
+		return "bash"
+	}
+}
 
 // InitialModel initializes the TUI model.
 func InitialModel() Model {
@@ -127,9 +136,11 @@ func InitialModel() Model {
 		tabs:              make([]*Tab, 0),
 		mruOrder:          make(map[string]int),
 		apiURL:            fmt.Sprintf("http://127.0.0.1:%d", port),
+		port:              port,
 		token:             token,
 		scrollbackPager:   newRingBuffer(maxScrollback),
 		availableSessions: make([]SessionSummary, 0),
+		viewport:          viewport.New(80, 24),
 	}
 }
 
@@ -181,7 +192,7 @@ func (m *Model) createSessionAndConnect(sessionID *string) {
 			go func() {
 				reqBody, _ := json.Marshal(map[string]interface{}{
 					"id":      sid,
-					"command": defaultShell,
+					"command": defaultShell(),
 				})
 				req, _ := http.NewRequest("POST", fmt.Sprintf("%s/sessions", m.apiURL), bytes.NewBuffer(reqBody))
 				req.Header.Set("Authorization", "Bearer "+m.token)
@@ -204,7 +215,7 @@ func (m *Model) createSessionAndConnect(sessionID *string) {
 	params.Add("id", sid)
 	wsURL := url.URL{
 		Scheme:   "ws",
-		Host:     fmt.Sprintf("127.0.0.1:%d", m.getPort()),
+		Host:     fmt.Sprintf("127.0.0.1:%d", m.port),
 		Path:     "/attach",
 		RawQuery: params.Encode(),
 	}
@@ -214,7 +225,6 @@ func (m *Model) createSessionAndConnect(sessionID *string) {
 
 	tab := &Tab{
 		SessionID: sid,
-		Title:     sid,
 	}
 
 	m.tabs = append(m.tabs, tab)
@@ -271,21 +281,6 @@ func (m *Model) readLoop(tab *Tab) {
 	}
 }
 
-func (m *Model) getPort() int {
-	apiURL := m.apiURL
-	if len(apiURL) < 7 {
-		return 8080
-	}
-	portStr := apiURL[7:]
-	colonIdx := bytes.LastIndex([]byte(portStr), []byte(":"))
-	if colonIdx == -1 {
-		return 8080
-	}
-	var port int
-	_, _ = fmt.Sscanf(portStr[colonIdx+1:], "%d", &port)
-	return port
-}
-
 func (m Model) activeTab() *Tab {
 	if m.activeTabIndex < 0 || m.activeTabIndex >= len(m.tabs) {
 		return nil
@@ -293,12 +288,12 @@ func (m Model) activeTab() *Tab {
 	return m.tabs[m.activeTabIndex]
 }
 
-// Init implements the bubbletea.Model interface, returning the initial command.
+// Init implements tea.Model.
 func (m Model) Init() tea.Cmd {
 	return m.fetchSessionsCmd()
 }
 
-// Update implements the bubbletea.Model interface, handling user input and state changes.
+// Update implements tea.Model.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if m.quit {
 		return m, tea.Quit
@@ -314,10 +309,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.pagerMsg = ""
 			case " ":
 				m.viewport.ViewDown()
+			case "backspace":
+				m.viewport.ViewUp()
 			case "home":
 				m.viewport.GotoTop()
 			case "end":
 				m.viewport.GotoBottom()
+			case "up":
+				m.viewport.LineUp(1)
+			case "down":
+				m.viewport.LineDown(1)
 			}
 			return m, nil
 		}
@@ -327,17 +328,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleAction(action)
 		}
 
-		if tab := m.activeTab(); tab != nil && tab.Connected && !tab.Disconnected {
-			if tab.IsPrimary {
-				return m, m.sendToTab(tab, []byte(msg.String()))
-			}
-		}
-
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
 		if msg.String() == "ctrl+space" {
 			return m, m.requestPrimary()
+		}
+
+		if tab := m.activeTab(); tab != nil && tab.Connected && !tab.Disconnected {
+			if tab.IsPrimary {
+				return m, m.sendToTab(tab, []byte(msg.String()))
+			}
 		}
 
 	case tea.WindowSizeMsg:
@@ -429,7 +430,7 @@ func (m Model) handleAction(action Action) (tea.Model, tea.Cmd) {
 	case ActionScrollbackSearch:
 		m.pagerActive = true
 		m.pagerBuffer = m.scrollbackPager.Bytes()
-		m.pagerMsg = "Scrollback (q to quit, space to page, home/end to jump)"
+		m.pagerMsg = "Scrollback (q to quit, space/pgup to page, up/down to scroll, home/end to jump)"
 	}
 
 	return m, nil

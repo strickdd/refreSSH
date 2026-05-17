@@ -11,19 +11,18 @@ import (
 var tuiCmd = &cobra.Command{
 	Use:   "tui",
 	Short: "Launch the TUI interface",
-	Run: func(_ *cobra.Command, _ []string) {
+	RunE: func(_ *cobra.Command, _ []string) error {
 		m := tui.InitialModel()
-		if m.Err() != nil {
-			fmt.Printf("Error: %v\n", m.Err())
-			return
+		if err := m.Err(); err != nil {
+			return fmt.Errorf("failed to initialize TUI: %w", err)
 		}
 
 		p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion())
 
 		if _, err := p.Run(); err != nil {
-			fmt.Printf("Error starting TUI: %v\n", err)
-			return
+			return fmt.Errorf("TUI exited with error: %w", err)
 		}
+		return nil
 	},
 }
 
