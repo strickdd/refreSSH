@@ -44,7 +44,32 @@ cp -rf source dest          # NOT: cp -r source dest
 - `apt-get` - use `-y` flag
 - `brew` - use `HOMEBREW_NO_AUTO_UPDATE=1` env var
 
-<!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:ca08a54f -->
+## Agent Personas
+
+This project uses specialized AI personas defined in `.github/agents/`. Invoke a persona by naming it explicitly at the start of your request (e.g., "Vera, review this diff" or "Riley, monitor the CI build for PR #12"). Each persona has a specific role — choose the one (or combination) that matches the task.
+
+| Persona | Role | When to Invoke |
+|---------|------|----------------|
+| **Marcus** | TPM — planning, triaging, beads management | Breaking down features, managing backlog, release planning |
+| **Naomi** | Go Expert — systems programming, PTY, TUI, config | Implementing features, fixing bugs, writing Go code |
+| **Jarnathan** | DevSecOps — security, CI/CD, deployment implementer | Setting up CI/CD, writing deployment scripts, security features |
+| **Penelope** | DevSecOps reviewer — adversarial security assessment | Reviewing security-critical code, auth, crypto, attack surface analysis |
+| **Vera** | Adversarial code reviewer — design, data flow, correctness | Pre-PR code review, architecture review, data flow analysis, edge case discovery |
+| **Riley** | DevOps monitor — local CI/CD build watcher | Monitoring PR builds, diagnosing CI failures, checking Copilot comments |
+
+**Invocation rules:**
+- Name the persona explicitly: "Penelope, review this PR" triggers the security reviewer
+- Use **Vera** for general code review (design, correctness, data flow)
+- Use **Penelope** when security is a concern (auth, crypto, injection, privilege escalation)
+- Use **Vera + Penelope** together for PRs with security impact — Vera reviews first, then passes to Penelope
+- Use **Riley** to watch CI builds after pushing changes
+- Use **Marcus** for task planning and beads management
+
+**Agent files are located in:** `.github/agents/` — each persona has a dedicated `.md` file with full role definition.
+
+**Skills are located in:** `.github/skills/` — each skill defines a step-by-step procedure for a specific agent task.
+
+<!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:7510c1e2 -->
 ## Beads Issue Tracker
 
 This project uses **bd (beads)** for issue tracking. Run `bd prime` to see full workflow context and commands.
@@ -64,6 +89,8 @@ bd close <id>         # Complete work
 - Run `bd prime` for detailed command reference and session close protocol
 - Use `bd remember` for persistent knowledge — do NOT use MEMORY.md files
 
+**Architecture in one line:** issues live in a local Dolt DB; sync uses `refs/dolt/data` on your git remote; `.beads/issues.jsonl` is a passive export. See https://github.com/gastownhall/beads/blob/main/docs/SYNC_CONCEPTS.md for details and anti-patterns.
+
 ## Session Completion
 
 **When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
@@ -76,7 +103,6 @@ bd close <id>         # Complete work
 4. **PUSH TO REMOTE** - This is MANDATORY:
    ```bash
    git pull --rebase
-   bd dolt push
    git push
    git status  # MUST show "up to date with origin"
    ```
