@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"os/exec"
 
 	"github.com/spf13/cobra"
 	"github.com/strickdd/refressh/internal/config"
@@ -14,8 +16,10 @@ import (
 var createCmd = &cobra.Command{
 	Use:   "create [session-id] [command] [args...]",
 	Short: "Create a new terminal session",
+	Long:  "Create a new terminal session. By default, attaches to the session after creation. Use --no-attach to create without entering.",
 	Args:  cobra.MinimumNArgs(2),
-	Run: func(_ *cobra.Command, args []string) {
+	Run: func(cmd *cobra.Command, args []string) {
+		noAttach, _ := cmd.Flags().GetBool("no-attach")
 		sessionID := args[0]
 		command := args[1]
 		cmdArgs := args[2:]
@@ -62,6 +66,20 @@ var createCmd = &cobra.Command{
 				return
 			}
 			fmt.Printf("Session '%s' created successfully.\n", s.ID)
+
+			if !noAttach {
+				fmt.Printf("Attaching to session '%s'...\n", s.ID)
+				executable, err := os.Executable()
+				if err != nil {
+					fmt.Printf("Error getting executable path: %v\n", err)
+					return
+				}
+				execCmd := exec.Command(executable, "attach", sessionID) //nolint:gosec
+				execCmd.Stdin = os.Stdin
+				execCmd.Stdout = os.Stdout
+				execCmd.Stderr = os.Stderr
+				_ = execCmd.Run()
+			}
 		} else {
 			fmt.Printf("Error creating session: %s\n", resp.Status)
 		}
@@ -69,5 +87,6 @@ var createCmd = &cobra.Command{
 }
 
 func init() {
+	createCmd.Flags().Bool("no-attach", false, "Create session without attaching to it")
 	rootCmd.AddCommand(createCmd)
 }
