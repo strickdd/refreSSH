@@ -13,23 +13,31 @@ import (
 )
 
 var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		origin := r.Header.Get("Origin")
-		if origin == "" {
-			return true // Not a browser request (likely CLI)
-		}
-		u, err := url.Parse(origin)
-		if err != nil {
-			return false
-		}
-		// Strictly allow only local origins to prevent CSWH
-		return u.Hostname() == "localhost" || u.Hostname() == "127.0.0.1"
-	},
-}
+		CheckOrigin: func(r *http.Request) bool {
+			origin := r.Header.Get("Origin")
+			if origin == "" {
+				return true // Not a browser request (likely CLI)
+			}
+			u, err := url.Parse(origin)
+			if err != nil {
+				return false
+			}
+			// Strictly allow only local origins to prevent CSWH
+			return u.Hostname() == "localhost" || u.Hostname() == "127.0.0.1"
+		},
+		ReadBufferSize:  4096,
+		WriteBufferSize: 4096,
+	}
 
 const (
 	// writeWait is the maximum time to wait for a message to be written.
 	writeWait = 10 * time.Second
+	// readWait is the maximum time to wait for a message to be read before closing idle connections.
+	readWait = 60 * time.Second
+	// pingPeriod is how often to send pings to detect dead connections.
+	pingPeriod = (readWait * 9) / 10
+	// pongWait is how long to wait for a pong response before declaring the connection dead.
+	pongWait = readWait + 6*time.Second
 )
 
 // Client wraps a WebSocket connection to satisfy the daemon.Client interface.
@@ -76,6 +84,27 @@ func (c *Client) SendStatus(status daemon.Status) error {
 	return c.conn.WriteMessage(websocket.TextMessage, data)
 }
 
+func (c *Client) startPingLoop(conn *websocket.Conn, quit chan struct{}) {
+	ticker := time.NewTicker(pingPeriod)
+	go func() {
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				c.mu.Lock()
+				_ = conn.SetWriteDeadline(time.Now().Add(writeWait))
+				if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+					c.mu.Unlock()
+					return
+				}
+				c.mu.Unlock()
+			case <-quit:
+				return
+			}
+		}
+	}()
+}
+
 // Handler returns an HTTP handler for WebSocket attachment.
 func Handler(d *daemon.Daemon) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -96,26 +125,39 @@ func Handler(d *daemon.Daemon) http.HandlerFunc {
 			fmt.Printf("Upgrade failed for session %s: %v\n", sessionID, err)
 			return
 		}
-		defer conn.Close() //nolint:errcheck
 
 		// Use remote address as client ID for uniqueness within this session
 		clientID := r.RemoteAddr
 		client := NewWSClient(clientID, conn)
 
+		// Set initial read deadline for idle timeout
+		conn.SetReadDeadline(time.Now().Add(readWait))
+
+		// Set close handler to ignore close frames (we manage close lifecycle)
+		conn.SetCloseHandler(func(_ int, _ string) error {
+			return nil
+		})
+
 		fmt.Printf("Client %s connected to session %s\n", clientID, sessionID)
 
 		s.Broadcaster.AddClient(client)
-		defer func() {
-			fmt.Printf("Client %s disconnected from session %s\n", clientID, sessionID)
-			s.Broadcaster.RemoveClient(clientID)
-		}()
 
-		// Input loop: forward messages from WebSocket to Broadcaster
+		// Start ping/pong keepalive goroutine
+		quit := make(chan struct{})
+		client.startPingLoop(conn, quit)
+
+		// Read loop: handle incoming messages
 		for {
 			msgType, message, err := conn.ReadMessage()
 			if err != nil {
+				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure, websocket.CloseAbnormalClosure) {
+					fmt.Printf("Client %s WS unexpected error: %v\n", clientID, err)
+				}
 				break
 			}
+
+			// Reset read deadline on each successful message
+			conn.SetReadDeadline(time.Now().Add(readWait))
 
 			if msgType == websocket.TextMessage {
 				type ControlMessage struct {
@@ -136,5 +178,11 @@ func Handler(d *daemon.Daemon) http.HandlerFunc {
 				break
 			}
 		}
+
+		// Signal ping loop to stop and cleanup
+		close(quit)
+		fmt.Printf("Client %s disconnected from session %s\n", clientID, sessionID)
+		s.Broadcaster.RemoveClient(clientID)
+		conn.Close() //nolint:errcheck,gosec
 	}
 }

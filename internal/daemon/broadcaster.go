@@ -27,10 +27,12 @@ const (
 )
 
 type clientState struct {
-	client Client
-	send   chan []byte
-	quit   chan struct{}
-	wg     sync.WaitGroup
+	client     Client
+	send       chan []byte
+	quit       chan struct{}
+	writeError chan struct{}
+	removed    chan struct{}
+	wg         sync.WaitGroup
 }
 
 // Broadcaster manages a set of connected clients and handles asynchronous PTY output distribution.
@@ -41,6 +43,7 @@ type Broadcaster struct {
 	scrollback      []byte
 	mu              sync.RWMutex
 	closed          bool
+	deadClients     []string
 }
 
 // NewBroadcaster creates and initializes a new Broadcaster instance.
@@ -76,9 +79,11 @@ func (b *Broadcaster) AddClient(c Client) {
 	}
 
 	state := &clientState{
-		client: c,
-		send:   make(chan []byte, clientBufferSize),
-		quit:   make(chan struct{}),
+		client:     c,
+		send:       make(chan []byte, clientBufferSize),
+		quit:       make(chan struct{}),
+		writeError: make(chan struct{}, 1),
+		removed:    make(chan struct{}),
 	}
 	b.clients[c.ID()] = state
 
@@ -92,6 +97,12 @@ func (b *Broadcaster) AddClient(c Client) {
 	state.wg.Add(1)
 	go b.clientWriteLoop(state)
 
+	// Monitor for write errors to clean up dead clients
+	go func() {
+		<-state.writeError
+		b.RemoveClient(c.ID())
+	}()
+
 	// If no primary client, make this one primary
 	if b.primaryClientID == "" {
 		b.primaryClientID = c.ID()
@@ -101,11 +112,26 @@ func (b *Broadcaster) AddClient(c Client) {
 	b.updateClientStatuses()
 }
 
+func (b *Broadcaster) removeDeadClients() {
+	b.mu.Lock()
+	if len(b.deadClients) == 0 {
+		b.mu.Unlock()
+		return
+	}
+	dead := b.deadClients
+	b.deadClients = nil
+	b.mu.Unlock()
+
+	for _, id := range dead {
+		b.RemoveClient(id)
+	}
+}
+
 // RemoveClient unregisters a client by its unique identifier and cleans up its resources.
 func (b *Broadcaster) RemoveClient(id string) {
 	b.mu.Lock()
 	if state, ok := b.clients[id]; ok {
-		close(state.quit)
+		close(state.removed)
 		b.mu.Unlock()
 		state.wg.Wait()
 		b.mu.Lock()
@@ -114,7 +140,6 @@ func (b *Broadcaster) RemoveClient(id string) {
 
 	if b.primaryClientID == id {
 		b.primaryClientID = ""
-		// Promote another client if available
 		for nextID := range b.clients {
 			b.primaryClientID = nextID
 			break
@@ -122,6 +147,7 @@ func (b *Broadcaster) RemoveClient(id string) {
 	}
 	b.mu.Unlock()
 
+	b.removeDeadClients()
 	b.updateClientStatuses()
 }
 
@@ -149,6 +175,7 @@ func (b *Broadcaster) Close() {
 	for _, state := range b.clients {
 		states = append(states, state)
 		close(state.quit)
+		close(state.removed)
 	}
 	b.mu.Unlock()
 
@@ -177,10 +204,19 @@ func (b *Broadcaster) updateClientStatuses() {
 	}
 	b.mu.RUnlock()
 
+	var dead []string
 	for _, t := range targets {
-		_ = t.c.SendStatus(Status{
+		if err := t.c.SendStatus(Status{
 			IsPrimary: t.isPrimary,
-		}) //nolint:errcheck
+		}); err != nil {
+			dead = append(dead, t.c.ID())
+		}
+	}
+
+	if len(dead) > 0 {
+		b.mu.Lock()
+		b.deadClients = append(b.deadClients, dead...)
+		b.mu.Unlock()
 	}
 }
 
@@ -190,9 +226,13 @@ func (b *Broadcaster) clientWriteLoop(state *clientState) {
 		select {
 		case data := <-state.send:
 			if _, err := state.client.Write(data); err != nil {
+				select {
+				case state.writeError <- struct{}{}:
+				default:
+				}
 				return
 			}
-		case <-state.quit:
+		case <-state.removed:
 			return
 		}
 	}
