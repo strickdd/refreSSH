@@ -130,14 +130,18 @@ func (b *Broadcaster) removeDeadClients() {
 // RemoveClient unregisters a client by its unique identifier and cleans up its resources.
 func (b *Broadcaster) RemoveClient(id string) {
 	b.mu.Lock()
-	if state, ok := b.clients[id]; ok {
-		close(state.removed)
+	if _, ok := b.clients[id]; !ok {
 		b.mu.Unlock()
-		state.wg.Wait()
-		b.mu.Lock()
-		delete(b.clients, id)
+		return
 	}
+	state := b.clients[id]
+	delete(b.clients, id)
+	b.mu.Unlock()
 
+	close(state.removed)
+	state.wg.Wait()
+
+	b.mu.Lock()
 	if b.primaryClientID == id {
 		b.primaryClientID = ""
 		for nextID := range b.clients {
