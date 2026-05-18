@@ -6,7 +6,7 @@ Welcome to Beads! This repository uses **Beads** for issue tracking - a modern, 
 
 Beads is issue tracking that lives in your repo, making it perfect for AI coding agents and developers who want their issues close to their code. No web UI required - everything works through the CLI and integrates seamlessly with git.
 
-**Learn more:** [github.com/steveyegge/beads](https://github.com/steveyegge/beads)
+**Learn more:** [github.com/gastownhall/beads](https://github.com/gastownhall/beads)
 
 ## Quick Start
 
@@ -38,44 +38,7 @@ Issues in Beads are:
 - **Branch-aware**: Issues can follow your branch workflow
 - **Always in sync**: Auto-syncs with your commits
 
-## Why Beads?
-
-✨ **AI-Native Design**
-- Built specifically for AI-assisted development workflows
-- CLI-first interface works seamlessly with AI coding agents
-- No context switching to web UIs
-
-🚀 **Developer Focused**
-- Issues live in your repo, right next to your code
-- Works offline, syncs when you push
-- Fast, lightweight, and stays out of your way
-
-🔧 **Git Integration**
-- Automatic sync with git commits
-- Branch-aware issue tracking
-- Dolt-native three-way merge resolution
-
-## Get Started with Beads
-
-Try Beads in your own projects:
-
-```bash
-# Install Beads
-curl -sSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash
-
-# Initialize in your repo
-bd init
-
-# Create your first issue
-bd create "Try out Beads"
-```
-
 ## Learn More
 
-- **Documentation**: [github.com/steveyegge/beads/docs](https://github.com/steveyegge/beads/tree/main/docs)
-- **Quick Start Guide**: Run `bd quickstart`
-- **Examples**: [github.com/steveyegge/beads/examples](https://github.com/steveyegge/beads/tree/main/examples)
-
----
-
-*Beads: Issue tracking that moves at the speed of thought* ⚡
+- **Documentation**: [github.com/gastownhall/beads/docs](https://github.com/gastownhall/beads/tree/main/docs)
+- **Quick Start**: Run `bd quickstart`
