@@ -9,11 +9,6 @@ import (
 	"github.com/strickdd/refressh/internal/daemon"
 )
 
-var daemonCmd = &cobra.Command{
-	Use:   "daemon",
-	Short: "Manage the refreSSH daemon",
-}
-
 var startCmd = &cobra.Command{
 	Use:   "start",
 	Short: "Start the refreSSH daemon",
@@ -37,6 +32,5 @@ var startCmd = &cobra.Command{
 }
 
 func init() {
-	daemonCmd.AddCommand(startCmd)
-	rootCmd.AddCommand(daemonCmd)
+	rootCmd.AddCommand(startCmd)
 }

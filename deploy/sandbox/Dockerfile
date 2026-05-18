@@ -56,5 +56,4 @@ USER refressh
 EXPOSE 9000
 
 # Set the entrypoint to start the daemon
-# We use the 'daemon start' command as the default
-ENTRYPOINT ["refressh", "daemon", "start"]
+ENTRYPOINT ["refressh", "start"]

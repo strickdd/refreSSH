@@ -45,7 +45,7 @@ go build -o refressh ./cmd/refressh
 ### Standard Mode
 ```bash
 # Start the daemon
-refressh daemon start
+refressh start
 
 # Create a new session
 refressh create my-session bash

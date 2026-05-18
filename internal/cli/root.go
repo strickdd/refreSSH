@@ -11,8 +11,8 @@ var rootCmd = &cobra.Command{
 	Long: `refreSSH is a user-level background daemon designed to host and manage 
 persistent terminal sessions, optimized for AI CLI agents.`,
 	PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
-		// Skip auto-start for 'daemon' commands
-		if cmd.Name() == "start" || cmd.Parent().Name() == "daemon" || cmd.Name() == "daemon" {
+		// Skip auto-start for 'start' command
+		if cmd.Name() == "start" {
 			return nil
 		}
 		return ensureDaemonRunning()
