@@ -187,7 +187,11 @@ func TestReadDeadlineClosesIdleConnections(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to dial: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			t.Logf("Failed to close connection: %v", err)
+		}
+	}()
 
 	// Consume the initial status message
 	_, _, err = conn.ReadMessage()
@@ -252,7 +256,9 @@ func TestWriteErrorRemovesStaleClient(t *testing.T) {
 	}
 
 	// Close the first connection abruptly (simulating a stale disconnect)
-	conn1.Close()
+	if err := conn1.Close(); err != nil {
+		t.Logf("Failed to close conn1: %v", err)
+	}
 
 	// Wait for the handler read loop to detect the disconnect and clean up
 	time.Sleep(500 * time.Millisecond)
@@ -262,7 +268,11 @@ func TestWriteErrorRemovesStaleClient(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to dial second client: %v", err)
 	}
-	defer conn2.Close()
+	defer func() {
+		if err := conn2.Close(); err != nil {
+			t.Logf("Failed to close conn2: %v", err)
+		}
+	}()
 
 	// Read until we get a status message (text message with is_primary)
 	timeout := time.After(2 * time.Second)

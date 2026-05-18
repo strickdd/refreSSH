@@ -574,138 +574,79 @@ func keyToBytes(k tea.KeyMsg) []byte {
 		return []byte(string(k.Runes))
 	}
 
-	switch k.Type {
-	// Control characters
-	case tea.KeyCtrlAt:
-		return []byte{0x00}
-	case tea.KeyCtrlA:
-		return []byte{0x01}
-	case tea.KeyCtrlB:
-		return []byte{0x02}
-	case tea.KeyCtrlC:
-		return []byte{0x03}
-	case tea.KeyCtrlD:
-		return []byte{0x04}
-	case tea.KeyCtrlE:
-		return []byte{0x05}
-	case tea.KeyCtrlF:
-		return []byte{0x06}
-	case tea.KeyCtrlG:
-		return []byte{0x07}
-	case tea.KeyCtrlH:
-		return []byte{0x08}
-	case tea.KeyTab:
-		return []byte{0x09}
-	case tea.KeyCtrlJ:
-		return []byte{0x0A}
-	case tea.KeyCtrlK:
-		return []byte{0x0B}
-	case tea.KeyCtrlL:
-		return []byte{0x0C}
-	case tea.KeyEnter:
-		return []byte{0x0D}
-	case tea.KeyCtrlN:
-		return []byte{0x0E}
-	case tea.KeyCtrlO:
-		return []byte{0x0F}
-	case tea.KeyCtrlP:
-		return []byte{0x10}
-	case tea.KeyCtrlQ:
-		return []byte{0x11}
-	case tea.KeyCtrlR:
-		return []byte{0x12}
-	case tea.KeyCtrlS:
-		return []byte{0x13}
-	case tea.KeyCtrlT:
-		return []byte{0x14}
-	case tea.KeyCtrlU:
-		return []byte{0x15}
-	case tea.KeyCtrlV:
-		return []byte{0x16}
-	case tea.KeyCtrlW:
-		return []byte{0x17}
-	case tea.KeyCtrlX:
-		return []byte{0x18}
-	case tea.KeyCtrlY:
-		return []byte{0x19}
-	case tea.KeyCtrlZ:
-		return []byte{0x1A}
-	case tea.KeyEsc:
-		return []byte{0x1B}
-	case tea.KeyCtrlBackslash:
-		return []byte{0x1C}
-	case tea.KeyCtrlCloseBracket:
-		return []byte{0x1D}
-	case tea.KeyCtrlCaret:
-		return []byte{0x1E}
-	case tea.KeyCtrlUnderscore:
-		return []byte{0x1F}
-
-	// Arrow keys and special keys (ANSI escape sequences)
-	case tea.KeyUp:
-		return []byte("\x1b[A")
-	case tea.KeyDown:
-		return []byte("\x1b[B")
-	case tea.KeyRight:
-		return []byte("\x1b[C")
-	case tea.KeyLeft:
-		return []byte("\x1b[D")
-	case tea.KeyBackspace:
-		return []byte{0x7F}
-	case tea.KeyDelete:
-		return []byte("\x1b[3~")
-	case tea.KeyInsert:
-		return []byte("\x1b[2~")
-	case tea.KeyHome:
-		return []byte("\x1b[H")
-	case tea.KeyEnd:
-		return []byte("\x1b[F")
-	case tea.KeyPgUp:
-		return []byte("\x1b[5~")
-	case tea.KeyPgDown:
-		return []byte("\x1b[6~")
-	case tea.KeyF1:
-		return []byte("\x1bOP")
-	case tea.KeyF2:
-		return []byte("\x1bOQ")
-	case tea.KeyF3:
-		return []byte("\x1bOR")
-	case tea.KeyF4:
-		return []byte("\x1bOS")
-	case tea.KeyF5:
-		return []byte("\x1b[15~")
-	case tea.KeyF6:
-		return []byte("\x1b[17~")
-	case tea.KeyF7:
-		return []byte("\x1b[18~")
-	case tea.KeyF8:
-		return []byte("\x1b[19~")
-	case tea.KeyF9:
-		return []byte("\x1b[20~")
-	case tea.KeyF10:
-		return []byte("\x1b[21~")
-	case tea.KeyF11:
-		return []byte("\x1b[23~")
-	case tea.KeyF12:
-		return []byte("\x1b[24~")
-	case tea.KeyF13:
-		return []byte("\x1b[25~")
-	case tea.KeyF14:
-		return []byte("\x1b[26~")
-	case tea.KeyF15:
-		return []byte("\x1b[28~")
-	case tea.KeyF16:
-		return []byte("\x1b[29~")
-	case tea.KeyF17:
-		return []byte("\x1b[31~")
-	case tea.KeyF18:
-		return []byte("\x1b[32~")
-	case tea.KeyF19:
-		return []byte("\x1b[33~")
-	case tea.KeyF20:
-		return []byte("\x1b[34~")
+	if seq, ok := keySequence[k.Type]; ok {
+		return seq
 	}
 
-	// Fallback for any unrecognized key
 	return []byte(k.String())
+}
+
+// keySequence maps key types to their PTY byte sequences.
+var keySequence = map[tea.KeyType][]byte{
+	// Control characters
+	tea.KeyCtrlAt:       {0x00},
+	tea.KeyCtrlA:        {0x01},
+	tea.KeyCtrlB:        {0x02},
+	tea.KeyCtrlC:        {0x03},
+	tea.KeyCtrlD:        {0x04},
+	tea.KeyCtrlE:        {0x05},
+	tea.KeyCtrlF:        {0x06},
+	tea.KeyCtrlG:        {0x07},
+	tea.KeyCtrlH:        {0x08},
+	tea.KeyTab:          {0x09},
+	tea.KeyCtrlJ:        {0x0A},
+	tea.KeyCtrlK:        {0x0B},
+	tea.KeyCtrlL:        {0x0C},
+	tea.KeyEnter:        {0x0D},
+	tea.KeyCtrlN:        {0x0E},
+	tea.KeyCtrlO:        {0x0F},
+	tea.KeyCtrlP:        {0x10},
+	tea.KeyCtrlQ:        {0x11},
+	tea.KeyCtrlR:        {0x12},
+	tea.KeyCtrlS:        {0x13},
+	tea.KeyCtrlT:        {0x14},
+	tea.KeyCtrlU:        {0x15},
+	tea.KeyCtrlV:        {0x16},
+	tea.KeyCtrlW:        {0x17},
+	tea.KeyCtrlX:        {0x18},
+	tea.KeyCtrlY:        {0x19},
+	tea.KeyCtrlZ:        {0x1A},
+	tea.KeyEsc:          {0x1B},
+	tea.KeyCtrlBackslash:    {0x1C},
+	tea.KeyCtrlCloseBracket: {0x1D},
+	tea.KeyCtrlCaret:      {0x1E},
+	tea.KeyCtrlUnderscore:   {0x1F},
+	tea.KeyBackspace:        {0x7F},
+
+	// Arrow keys and special keys (ANSI escape sequences)
+	tea.KeyUp:    []byte("\x1b[A"),
+	tea.KeyDown:  []byte("\x1b[B"),
+	tea.KeyRight: []byte("\x1b[C"),
+	tea.KeyLeft:  []byte("\x1b[D"),
+	tea.KeyDelete: []byte("\x1b[3~"),
+	tea.KeyInsert:   []byte("\x1b[2~"),
+	tea.KeyHome:     []byte("\x1b[H"),
+	tea.KeyEnd:      []byte("\x1b[F"),
+	tea.KeyPgUp:     []byte("\x1b[5~"),
+	tea.KeyPgDown:   []byte("\x1b[6~"),
+	tea.KeyF1:   []byte("\x1bOP"),
+	tea.KeyF2:   []byte("\x1bOQ"),
+	tea.KeyF3:   []byte("\x1bOR"),
+	tea.KeyF4:   []byte("\x1bOS"),
+	tea.KeyF5:   []byte("\x1b[15~"),
+	tea.KeyF6:   []byte("\x1b[17~"),
+	tea.KeyF7:   []byte("\x1b[18~"),
+	tea.KeyF8:   []byte("\x1b[19~"),
+	tea.KeyF9:   []byte("\x1b[20~"),
+	tea.KeyF10:  []byte("\x1b[21~"),
+	tea.KeyF11:  []byte("\x1b[23~"),
+	tea.KeyF12:  []byte("\x1b[24~"),
+	tea.KeyF13:  []byte("\x1b[25~"),
+	tea.KeyF14:  []byte("\x1b[26~"),
+	tea.KeyF15:  []byte("\x1b[28~"),
+	tea.KeyF16:  []byte("\x1b[29~"),
+	tea.KeyF17:  []byte("\x1b[31~"),
+	tea.KeyF18:  []byte("\x1b[32~"),
+	tea.KeyF19:  []byte("\x1b[33~"),
+	tea.KeyF20:  []byte("\x1b[34~"),
 }

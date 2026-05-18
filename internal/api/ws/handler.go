@@ -131,7 +131,9 @@ func Handler(d *daemon.Daemon) http.HandlerFunc {
 		client := NewWSClient(clientID, conn)
 
 		// Set initial read deadline for idle timeout
-		conn.SetReadDeadline(time.Now().Add(readWait))
+		if err := conn.SetReadDeadline(time.Now().Add(readWait)); err != nil {
+			fmt.Printf("Client %s failed to set read deadline: %v\n", clientID, err)
+		}
 
 		// Set close handler to ignore close frames (we manage close lifecycle)
 		conn.SetCloseHandler(func(_ int, _ string) error {
@@ -157,7 +159,9 @@ func Handler(d *daemon.Daemon) http.HandlerFunc {
 			}
 
 			// Reset read deadline on each successful message
-			conn.SetReadDeadline(time.Now().Add(readWait))
+			if err := conn.SetReadDeadline(time.Now().Add(readWait)); err != nil {
+				fmt.Printf("Client %s failed to reset read deadline: %v\n", clientID, err)
+			}
 
 			if msgType == websocket.TextMessage {
 				type ControlMessage struct {
