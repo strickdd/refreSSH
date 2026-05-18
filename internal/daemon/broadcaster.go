@@ -316,5 +316,20 @@ func (b *Broadcaster) HandleInput(clientID string, data []byte) (int, error) {
 		return 0, nil
 	}
 
+	data = translateInput(data)
 	return writer.Write(data)
+}
+
+// translateInput normalizes key sequences from different terminal emulators
+// to match what Unix/Linux PTY line disciplines expect.
+func translateInput(data []byte) []byte {
+	// Windows Terminal (and Windows ConPTY) sends \x08 (Ctrl+H) for backspace,
+	// but Unix/Linux terminals expect \x7F (DEL) as the erase character.
+	// Translate \x08 → \x7F so backspace works correctly in remote sessions.
+	for i, b := range data {
+		if b == 0x08 {
+			data[i] = 0x7F
+		}
+	}
+	return data
 }
