@@ -337,7 +337,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		if tab := m.activeTab(); tab != nil && tab.Connected && !tab.Disconnected {
 			if tab.IsPrimary {
-				return m, m.sendToTab(tab, []byte(msg.String()))
+				return m, m.sendToTab(tab, keyToBytes(msg))
 			}
 		}
 
@@ -563,4 +563,149 @@ type WSError struct {
 // Err returns the initialization error if the model failed to load.
 func (m Model) Err() error {
 	return m.err
+}
+
+// keyToBytes converts a Bubble Tea key message to the raw bytes that should be
+// sent to the PTY. Control characters and special keys are translated to their
+// actual ASCII/control codes or ANSI escape sequences so the remote terminal
+// receives the same input it would from a native terminal emulator.
+func keyToBytes(k tea.KeyMsg) []byte {
+	if k.Type == tea.KeyRunes {
+		return []byte(string(k.Runes))
+	}
+
+	switch k.Type {
+	// Control characters
+	case tea.KeyCtrlAt:
+		return []byte{0x00}
+	case tea.KeyCtrlA:
+		return []byte{0x01}
+	case tea.KeyCtrlB:
+		return []byte{0x02}
+	case tea.KeyCtrlC:
+		return []byte{0x03}
+	case tea.KeyCtrlD:
+		return []byte{0x04}
+	case tea.KeyCtrlE:
+		return []byte{0x05}
+	case tea.KeyCtrlF:
+		return []byte{0x06}
+	case tea.KeyCtrlG:
+		return []byte{0x07}
+	case tea.KeyCtrlH:
+		return []byte{0x08}
+	case tea.KeyTab:
+		return []byte{0x09}
+	case tea.KeyCtrlJ:
+		return []byte{0x0A}
+	case tea.KeyCtrlK:
+		return []byte{0x0B}
+	case tea.KeyCtrlL:
+		return []byte{0x0C}
+	case tea.KeyEnter:
+		return []byte{0x0D}
+	case tea.KeyCtrlN:
+		return []byte{0x0E}
+	case tea.KeyCtrlO:
+		return []byte{0x0F}
+	case tea.KeyCtrlP:
+		return []byte{0x10}
+	case tea.KeyCtrlQ:
+		return []byte{0x11}
+	case tea.KeyCtrlR:
+		return []byte{0x12}
+	case tea.KeyCtrlS:
+		return []byte{0x13}
+	case tea.KeyCtrlT:
+		return []byte{0x14}
+	case tea.KeyCtrlU:
+		return []byte{0x15}
+	case tea.KeyCtrlV:
+		return []byte{0x16}
+	case tea.KeyCtrlW:
+		return []byte{0x17}
+	case tea.KeyCtrlX:
+		return []byte{0x18}
+	case tea.KeyCtrlY:
+		return []byte{0x19}
+	case tea.KeyCtrlZ:
+		return []byte{0x1A}
+	case tea.KeyEsc:
+		return []byte{0x1B}
+	case tea.KeyCtrlBackslash:
+		return []byte{0x1C}
+	case tea.KeyCtrlCloseBracket:
+		return []byte{0x1D}
+	case tea.KeyCtrlCaret:
+		return []byte{0x1E}
+	case tea.KeyCtrlUnderscore:
+		return []byte{0x1F}
+
+	// Arrow keys and special keys (ANSI escape sequences)
+	case tea.KeyUp:
+		return []byte("\x1b[A")
+	case tea.KeyDown:
+		return []byte("\x1b[B")
+	case tea.KeyRight:
+		return []byte("\x1b[C")
+	case tea.KeyLeft:
+		return []byte("\x1b[D")
+	case tea.KeyBackspace:
+		return []byte{0x7F}
+	case tea.KeyDelete:
+		return []byte("\x1b[3~")
+	case tea.KeyInsert:
+		return []byte("\x1b[2~")
+	case tea.KeyHome:
+		return []byte("\x1b[H")
+	case tea.KeyEnd:
+		return []byte("\x1b[F")
+	case tea.KeyPgUp:
+		return []byte("\x1b[5~")
+	case tea.KeyPgDown:
+		return []byte("\x1b[6~")
+	case tea.KeyF1:
+		return []byte("\x1bOP")
+	case tea.KeyF2:
+		return []byte("\x1bOQ")
+	case tea.KeyF3:
+		return []byte("\x1bOR")
+	case tea.KeyF4:
+		return []byte("\x1bOS")
+	case tea.KeyF5:
+		return []byte("\x1b[15~")
+	case tea.KeyF6:
+		return []byte("\x1b[17~")
+	case tea.KeyF7:
+		return []byte("\x1b[18~")
+	case tea.KeyF8:
+		return []byte("\x1b[19~")
+	case tea.KeyF9:
+		return []byte("\x1b[20~")
+	case tea.KeyF10:
+		return []byte("\x1b[21~")
+	case tea.KeyF11:
+		return []byte("\x1b[23~")
+	case tea.KeyF12:
+		return []byte("\x1b[24~")
+	case tea.KeyF13:
+		return []byte("\x1b[25~")
+	case tea.KeyF14:
+		return []byte("\x1b[26~")
+	case tea.KeyF15:
+		return []byte("\x1b[28~")
+	case tea.KeyF16:
+		return []byte("\x1b[29~")
+	case tea.KeyF17:
+		return []byte("\x1b[31~")
+	case tea.KeyF18:
+		return []byte("\x1b[32~")
+	case tea.KeyF19:
+		return []byte("\x1b[33~")
+	case tea.KeyF20:
+		return []byte("\x1b[34~")
+	}
+
+	// Fallback for any unrecognized key
+	return []byte(k.String())
 }
